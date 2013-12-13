@@ -3,6 +3,8 @@ package irt.flash.data.connection.dao;
 import irt.flash.data.Profile;
 import irt.flash.data.ProfileVariable;
 
+import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
 
@@ -29,15 +31,15 @@ public class DatabaseController extends Thread {
 	public void run() {
 
 		try {
-			Database database = Database.getInstance();
-			profileVariables = database.getAllProfileVariables();
+			Database database = setProfileVariables();
 
 			while (true) {
 				synchronized (this) { try { wait(); } catch (InterruptedException e) { logger.catching(e); } }
 
 				switch (action) {
 				case SET_PROFILE:
-					if (profile != null) { database.setProfile(profile); }
+					if (profile != null) 
+						database.setProfile(profile);
 					break;
 				case UPDATE:
 					if(profileStr!=null){
@@ -51,19 +53,29 @@ public class DatabaseController extends Thread {
 		}
 	}
 
+	public static List<ProfileVariable> getProfileVariables() {
+		return profileVariables!=null ? Collections.unmodifiableList(profileVariables) : null;
+	}
+
+	public static Database setProfileVariables() throws IOException, ClassNotFoundException, SQLException {
+		Database database = Database.getInstance();
+		profileVariables = database.getAllProfileVariables();
+		return database;
+	}
+
 	public synchronized void setProfile(Profile profile) {
+		logger.entry();
 		action = Action.SET_PROFILE;
 		this.profile = profile;
 		notify();
-	}
-
-	public static List<ProfileVariable> getProfileVariables() {
-		return Collections.unmodifiableList(profileVariables);
+		logger.exit();
 	}
 
 	public synchronized void update(String profileStr) {
+		logger.entry();
 		action = Action.UPDATE;
 		this.profileStr = profileStr;
 		notify();
+		logger.exit();
 	}
 }

@@ -26,6 +26,8 @@
 	<logger name="irt.flash.data.connection.dao.Database" level="WARN" />
 	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberProfile" level="ALL" />
 	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumbers" level="ALL" />
+	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberTable" level="ALL" />
+	<logger name="irt.flash.data.connection.dao.DatabaseController" level="ALL" />
 	<logger name="irt.flash.data.Profile" level="WARN" />
 
 		<Root level="WARN">

@@ -22,7 +22,14 @@ public class Table {
 				name = fields[0];
 
 			if (name.equals(fields[0])) {
-				tableMap.put(new BigDecimal(fields[1]), new BigDecimal(fields[2]));
+
+				BigDecimal key = new BigDecimal(fields[1]);
+				key.setScale(3, BigDecimal.ROUND_HALF_EVEN);
+
+				BigDecimal value = new BigDecimal(fields[2]);
+				value.setScale(3, BigDecimal.ROUND_HALF_EVEN);
+
+				tableMap.put(key, value);
 				set = true;
 			}
 		}

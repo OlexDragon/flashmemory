@@ -94,7 +94,7 @@ public class DatabaseSerialNumberProfile {
 		logger.exit();
 	}
 
-	public void setActive(Connection connection, long serialNumberId, Set<Object> activeProfileVariables) throws SQLException {
+	public void setActive(Connection connection, long serialNumberId, Set<Object> activeProfileVariables) throws SQLException, ClassNotFoundException, IOException {
 		logger.entry(serialNumberId, activeProfileVariables);
 
 		//get not used variables
@@ -167,7 +167,13 @@ public class DatabaseSerialNumberProfile {
 		return variableId;
 	}
 
-	public long getProfileVariableId(Connection connection, String variableName) throws SQLException {
+	public long getProfileVariableId(Connection connection, String variableName) throws SQLException, ClassNotFoundException, IOException {
+		logger.entry(variableName);
+
+		if(variableName==null || variableName.isEmpty()){
+			logger.warn("variableName = NULL or empty");
+			return 0;
+		}
 
 		long variableId = 0;
 		List<ProfileVariable> profileVariables = DatabaseController.getProfileVariables();
@@ -190,8 +196,12 @@ public class DatabaseSerialNumberProfile {
 				if(v.getName().equals(variableName)){
 					variableId = v.getId();
 				}
+			if(variableId<=0){
+				variableId = setProfileVariable(connection, variableName);
+				DatabaseController.setProfileVariables();
+			}
 		}
-		return variableId;
+		return logger.exit(variableId);
 	}
 
 	public List<ProfileVariable> getAllProfileVariables() throws ClassNotFoundException, SQLException, IOException {

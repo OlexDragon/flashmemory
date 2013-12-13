@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+	<Appenders>
+		<Console name="STDOUT" target="SYSTEM_OUT">
+			<PatternLayout pattern="%d [%t] %C{2} %M (%F:%L) %-5p - %m%xEx%n" />
+		</Console>
+
+		<RollingFile name="DumpFile" fileName="${sys:user.home}/irt/Flash.log"
+			filePattern="${sys:user.home}/irt/Flash/$${date:yyyy-MM}/Flash-%d{yyyy-MM-dd}-%i.log.gz"
+			bufferedIO="folse">
+			<PatternLayout pattern="%d [%t] %C{2} %M (%F:%L) %-5p - %m%xEx%n" />
+			<Policies>
+				<SizeBasedTriggeringPolicy size="500 MB" />
+			</Policies>
+			<DefaultRolloverStrategy max="10" />
+		</RollingFile>
+	</Appenders>
+
+	<Loggers>
+	<logger name="irt.flash.data.connection.FlashSerialPort" level="WARN" />
+	<logger name="irt.flash.presentation.panel.ConnectionPanel" level="ALL" />
+	<logger name="irt.flash.data.connection.FlashConnector" level="WARN" />
+	<logger name="irt.flash.data.connection.MicrocontrollerSTM32" level="WARN" />
+	<logger name="irt.flash.presentation.dialog.MessageDialog" level="WARN" />
+	<logger name="irt.flash.data.Profile" level="WARN" />
+	<logger name="irt.flash.data.connection.dao.Database" level="WARN" />
+	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberProfile" level="ALL" />
+	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumbers" level="ALL" />
+	<logger name="irt.flash.data.Profile" level="WARN" />
+
+		<Root level="WARN">
+			<AppenderRef ref="STDOUT" />
+			<AppenderRef ref="DumpFile" />
+		</Root>
+	</Loggers>
+</Configuration>

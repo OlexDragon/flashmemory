@@ -2,7 +2,7 @@
 <Configuration>
 	<Appenders>
 		<Console name="STDOUT" target="SYSTEM_OUT">
-			<PatternLayout pattern="%-5p %d [%t] %C{2} %M (%F:%L) - %m%xEx%n" />
+			<PatternLayout pattern="%d [%t] %C{2} %M (%F:%L) %-5p - %m%xEx%n" />
 		</Console>
 
 		<RollingFile name="DumpFile" fileName="${sys:user.home}/irt/Flash.log"
@@ -20,14 +20,14 @@
 	<logger name="irt.flash.data.connection.FlashSerialPort" level="WARN" />
 	<logger name="irt.flash.presentation.panel.ConnectionPanel" level="ALL" />
 	<logger name="irt.flash.data.connection.FlashConnector" level="WARN" />
-	<logger name="irt.flash.data.connection.MicrocontrollerSTM32" level="All" />
+	<logger name="irt.flash.data.connection.MicrocontrollerSTM32" level="WARN" />
 	<logger name="irt.flash.presentation.dialog.MessageDialog" level="WARN" />
 	<logger name="irt.flash.data.Profile" level="WARN" />
 	<logger name="irt.flash.data.connection.dao.Database" level="WARN" />
-	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberProfile" level="WARN" />
-	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumbers" level="WARN" />
-	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberTable" level="WARN" />
-	<logger name="irt.flash.data.connection.dao.DatabaseController" level="WARN" />
+	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberProfile" level="ALL" />
+	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumbers" level="ALL" />
+	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberTable" level="ALL" />
+	<logger name="irt.flash.data.connection.dao.DatabaseController" level="ALL" />
 	<logger name="irt.flash.data.Profile" level="WARN" />
 
 		<Root level="INFO">

@@ -15,8 +15,13 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.Logger;
+
 public class FlashApp extends JFrame {
 	private static final long serialVersionUID = 3813033753839141111L;
+
+	private static final Logger logger = (Logger) LogManager.getLogger();
 
 	protected static final Preferences prefs = Preferences.userRoot().node("IRT Technologies inc.");
 	private JPanel contentPane;
@@ -25,6 +30,7 @@ public class FlashApp extends JFrame {
 	 * Launch the application.
 	 */
 	public static void main(String[] args) {
+		logger.info("*** Application Starts ***");
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {

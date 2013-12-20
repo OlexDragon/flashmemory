@@ -23,14 +23,22 @@ public class Table {
 
 			if (name.equals(fields[0])) {
 
-				BigDecimal key = new BigDecimal(fields[1]);
-				key.setScale(3, BigDecimal.ROUND_HALF_EVEN);
+				BigDecimal value;
+				try{
+					BigDecimal key = new BigDecimal(fields[1]);
+					key.setScale(3, BigDecimal.ROUND_HALF_EVEN);
 
-				BigDecimal value = new BigDecimal(fields[2]);
-				value.setScale(3, BigDecimal.ROUND_HALF_EVEN);
+					value = new BigDecimal(fields[2]);
+					value.setScale(3, BigDecimal.ROUND_HALF_EVEN);
+					tableMap.put(key!=null ? key : new BigDecimal(-1), value!=null ? value : new BigDecimal(-1));
 
-				tableMap.put(key, value);
-				set = true;
+					set = true;
+
+				}catch(NumberFormatException e){
+					logger.error("{}, key = new BigDecimal({}), value = new BigDecimal({})", name, fields[1], fields[2]);
+					logger.catching(e);
+				}
+
 			}
 		}
 		return logger.exit(set);

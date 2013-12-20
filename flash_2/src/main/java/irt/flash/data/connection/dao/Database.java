@@ -41,16 +41,22 @@ public class Database {
 		databaseSerialNumberTable = new DatabaseSerialNumberTable(sqlProperties);
 	}
 
-	public long setProfile(Profile profile) throws ClassNotFoundException, SQLException, IOException{
-		logger.entry(profile);
+	public long setProfile(String profileStr) throws ClassNotFoundException, SQLException, IOException{
+		logger.entry(profileStr);
 		long serialNumberId = 0;
 
 		try(Connection connection = MySQLConnector.getConnection()){
-			String serialNumberStr = profile.getProperty(ProfileProperties.SERIAL_NUMBER.toString());
+
+			Profile profile = Profile.parseProfile(profileStr);
+			String serialNumberStr = profile .getProperty(ProfileProperties.SERIAL_NUMBER.toString());
+
 			if(serialNumberStr!=null){
 				serialNumberId = getSerialNumberId(connection, serialNumberStr);
-				setProfile(connection, serialNumberId, profile);
-				setTables(connection, serialNumberId, profile.getTables());
+				if(databaseSerialNumber.profileIsChanged(connection, serialNumberId, profileStr)){//profile have been changed
+					databaseSerialNumber.setProfile(connection, serialNumberId, profileStr);
+					setProfile(connection, serialNumberId, profile);
+					setTables(connection, serialNumberId, profile.getTables());
+				}
 			}else
 				logger.warn("Serial Number = NULL");
 		}
@@ -122,14 +128,16 @@ public class Database {
 		return databaseSerialNumberProfile.getAllProfileVariables();
 	}
 
-	public Long updateProfile(Profile oldProfile, Profile newProfile) throws SQLException, ClassNotFoundException, IOException {
-		logger.entry(oldProfile, newProfile);
+	public Long updateProfile(String oldProfileStr, String newProfileStr) throws SQLException, ClassNotFoundException, IOException {
+		logger.entry(oldProfileStr, newProfileStr);
 		long serialNumberId = 0;
 
 		try(Connection connection = MySQLConnector.getConnection()){
 
+			Profile oldProfile = Profile.parseProfile(oldProfileStr);
 			String serialNumberStr = oldProfile.getProperty(ProfileProperties.SERIAL_NUMBER.toString());
 
+			Profile newProfile = Profile.parseProfile(newProfileStr);
 			if(serialNumberStr==null) serialNumberStr = newProfile.getProperty(ProfileProperties.SERIAL_NUMBER.toString());
 
 			if (serialNumberStr != null)
@@ -138,5 +146,9 @@ public class Database {
 				logger.warn("Serial Number = NULL");
 		}
 		return logger.exit(serialNumberId);
+	}
+
+	public String getNextSerialNumber(String format) throws ClassNotFoundException, SQLException, IOException {
+		return databaseSerialNumber.getSerialNumbersStartWith(format);
 	}
 }

@@ -98,6 +98,9 @@ public class ConnectionPanel extends JPanel implements Observer {
 	private JMenuItem mntmCheckProgram_1;
 
 	private MessageDialog dialog;
+
+	private EditProfilePanel editProfile;
+
 	private volatile static byte[] buffer;
 	private volatile static DatabaseController databaseController = new DatabaseController();
 
@@ -506,6 +509,9 @@ public class ConnectionPanel extends JPanel implements Observer {
 			}
 		});
 		popupMenu.add(mntmCheckProgram_1);
+		
+		editProfile = new EditProfilePanel();
+		tabbedPane.addTab("Edit Profile", null, editProfile, null);
 		setLayout(groupLayout);
 
 		MicrocontrollerSTM32.getInstance().addObserver(this);
@@ -594,27 +600,34 @@ public class ConnectionPanel extends JPanel implements Observer {
 				MicrocontrollerSTM32 stm32 = (MicrocontrollerSTM32) o;
 				switch (stm32.getCommand()) {
 				case CONNECT:
+					logger.trace("CONNECT");
 					setConnected(stm32.getReadBytes());
 					break;
 				case ERASE:
+					logger.trace("ERASE");
 					dialog.setMessage(new Status[]{Status.ERASE.setMessage("Erased"), Status.BUTTON.setMessage("Ok")});
 					break;
 				case EXTENDED_ERASE:
+					logger.trace("EXTENDED_ERASE");
 					break;
 				case GET:
+					logger.trace("GET");
 					break;
 				case READ_MEMORY:
+					logger.trace("READ_MEMORY");
 					readMemory(stm32.getReadBytes());
 					break;
 				case WRITE_MEMORY:
+					logger.trace("WRITE_MEMORY");
 					break;
 				case USER_COMMAND:
-					break;
-				default:
+					logger.trace("USER_COMMAND");
 				}
 			}
-		} else 
+		} else{
+			logger.trace("dialog.setMessage({})", obj);
 			dialog.setMessage(obj);
+		}
 
 		}catch(Exception e){
 			logger.catching(e);
@@ -633,7 +646,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		} else {
 			if (readBytes != null) {
 				setTextPaneText(readBytes);
-				databaseController.setProfile(Profile.parseProfile(textPane.getText()));
+				databaseController.setProfile(textPane.getText());
 			} else {
 				setLabel(lblConnection, "Can Not read Memory", Color.RED);
 			}
@@ -678,10 +691,8 @@ public class ConnectionPanel extends JPanel implements Observer {
 		String path = "\\\\192.168.2.250\\Share\\4alex\\boards\\SW release\\latest\\";
 		Object selectedItem = comboBoxUnitType.getSelectedItem();
 
-		if(selectedItem.equals(Address.BIAS_R1.toString()))
-			path += "picobuc_r1.bin";
-		else if(selectedItem.equals(Address.BIAS_R2.toString()))
-			path += "picobuc_r2.bin";
+		if(selectedItem.equals(Address.BIAS.toString()))
+			path += "picobuc.bin";
 		else
 			path +=  "fcm.bin";
 

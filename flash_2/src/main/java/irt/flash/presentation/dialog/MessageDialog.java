@@ -12,6 +12,8 @@ import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.ActionListener;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JDialog;
@@ -29,6 +31,7 @@ import javax.swing.JProgressBar;
 import javax.swing.JLabel;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 
 import java.awt.Dimension;
 
@@ -48,6 +51,8 @@ public class MessageDialog extends JDialog implements Runnable{
 	private JProgressBar progressBar;
 
 	private JLabel lblProgress;
+
+	private List<Object> message = new ArrayList<>();
 
 	public static MessageDialog getInstance(Window owner){
 		if(messageDialog==null)
@@ -145,16 +150,26 @@ public class MessageDialog extends JDialog implements Runnable{
 			appHeight = appHeight + tmp;
 		int y = (int) (appY+(appHeight-getHeight())/2);
 
+		logger.trace("Location: x={}, y={}", x, y); 
 		setLocation(x, y);
-		notify();
+
+		if(!isVisible())//Set Visible
+			SwingUtilities.invokeLater(new Runnable() { @Override public void run() { logger.trace("setVisible(true)"); setVisible(true); dispose(); }
+		});
+
 		logger.exit();
 	}
 
 	@Override
 	public void run() {
 		while(true){
-			synchronized (this) { try { wait(); } catch (InterruptedException e) { logger.catching(e); } }
-			setVisible(!isVisible());
+			if(message.isEmpty()){
+				logger.trace("wait();");
+				synchronized (this) { try { wait(); } catch (InterruptedException e) { logger.catching(e); } }
+			}
+			logger.trace("SET MESSAGE: {}", message);
+			set(message.get(0));
+			message.remove(0);
 		}
 	}
 
@@ -170,7 +185,14 @@ public class MessageDialog extends JDialog implements Runnable{
 		return textArea.getText();
 	}
 
-	public synchronized <T> void setMessage(T message) {
+	public synchronized void setMessage(Object message){
+		logger.entry(message);
+		this.message.add(message);
+		notify();
+		logger.exit();
+	}
+
+	private synchronized <T> void set(T message) {
 		logger.entry(message);
 		if(message!=null){
 			if(message instanceof Status[])
@@ -181,37 +203,43 @@ public class MessageDialog extends JDialog implements Runnable{
 				setProgressBar((BigDecimal)message);
 			else if(message instanceof String)
 				setMessage((String)message);
-		}else
+		}else if(isVisible()){
+			logger.trace("setVisible(false); Text={}", textArea.getText());
+			panelProgressBar.setVisible(false);
 			setVisible(false);
+		}
 		logger.exit();
 	}
 
 	private void setProgressBar(BigDecimal bigDecimal) {
-		logger.entry();
+		logger.entry(bigDecimal);
 		int progress = bigDecimal.multiply(new BigDecimal(100)).intValueExact();
 		progressBar.setValue(progress);
 		lblProgress.setText(bigDecimal.toString()+" %");
 		if(!panelProgressBar.isVisible()){
 			panelProgressBar.setVisible(true);
 			resize();
-			logger.trace("Set Visible");
 		}
 		logger.exit();
 	}
 
 	private void setMessage(String text) {
+		logger.entry(text);
 		textArea.setText(text);
 		button.setText("Ok");
 		resize();
+		logger.exit();
 	}
 
-	private synchronized void setMessage(Status[] statuses) {
+	private void setMessage(Status[] statuses) {
+		logger.entry((Object)statuses);
 
 		for (Status s : statuses)
 				setMessage(s);
+		logger.exit();
 	}
 
-	private synchronized void setMessage(Status status) {
+	private void setMessage(Status status) {
 		logger.entry(status);
 		switch (status) {
 		case BUTTON:

@@ -10,10 +10,10 @@
 	<name>flash_2</name>
 	<url>http://maven.apache.org</url>
 
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.directory>src/main/java</project.directory>
-    </properties>
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.directory>src/main/java</project.directory>
+	</properties>
 
 	<dependencies>
 		<dependency>
@@ -41,16 +41,17 @@
 			<groupId>jSSC</groupId>
 			<artifactId>jSSC</artifactId>
 			<version>2.6.0</version>
-			<scope>system</scope>
-			<systemPath>C:\Users\Oleksandr\Desktop\java\eclipse\WorkspaceJava\j_irt_gui_3\resource\jssc.jar</systemPath>
 		</dependency>
 	</dependencies>
 
 	<build>
+ 		<finalName>STM32Flash2</finalName>
 		<sourceDirectory>${project.directory}</sourceDirectory>
 		<resources>
 			<resource>
+				<targetPath></targetPath>
 				<directory>${project.directory}</directory>
+				<filtering>true</filtering>
 				<excludes>
 					<exclude>**/*.java</exclude>
 				</excludes>
@@ -75,8 +76,7 @@
 					<archive>
 						<manifest>
 							<addClasspath>true</addClasspath>
-							<classpathPrefix>lib/</classpathPrefix>
-							<mainClass>irt.database.ComponentsDatabaseApp</mainClass>
+							<mainClass>irt.flash.FlashApp</mainClass>
 						</manifest>
 					</archive>
 				</configuration>
@@ -94,9 +94,42 @@
 						</goals>
 						<configuration>
 							<outputDirectory>
-								${project.build.directory}/lib
+								${project.build.directory}
 							</outputDirectory>
 						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>2.16</version>
+				<configuration>
+					<skipTests>true</skipTests>
+				</configuration>
+			</plugin>
+			<plugin>
+				<!-- NOTE: We don't need a groupId specification because the group is 
+					org.apache.maven.plugins ...which is assumed by default. -->
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>2.4</version>
+				<configuration>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+					<archive>
+						<manifest>
+							<mainClass>irt.flash.FlashApp</mainClass>
+						</manifest>
+					</archive>
+				</configuration>
+				<executions>
+					<execution>
+						<id>make-assembly</id> <!-- this is used for inheritance merges -->
+						<phase>package</phase> <!-- bind to the packaging phase -->
+						<goals>
+							<goal>single</goal>
+						</goals>
 					</execution>
 				</executions>
 			</plugin>

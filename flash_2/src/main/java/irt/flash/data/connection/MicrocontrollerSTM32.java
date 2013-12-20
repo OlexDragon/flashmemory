@@ -10,6 +10,7 @@ import java.util.Observable;
 
 import jssc.SerialPortException;
 
+import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 
@@ -17,8 +18,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
 	private static final Logger logger = (Logger) LogManager.getLogger();
 
-	public static final String BIAS_BOARD_R1 = "Bias Board.r1";
-	public static final String BIAS_BOARD_R2 = "Bias Board.r2";
+	public static final String BIAS_BOARD = "Bias Board";
 
 	public enum ProfileProperties {
 		/**
@@ -138,7 +138,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	}
 
 	public enum Address {
-		PROGRAM("PROGRAM", 0x08000000), CONVERTER("CONVERTER", 0x080C0000), BIAS_R1(BIAS_BOARD_R1, 0x080E0000), BIAS_R2(BIAS_BOARD_R2, 0x080E0000);
+		PROGRAM("PROGRAM", 0x08000000), CONVERTER("CONVERTER", 0x080C0000), BIAS(BIAS_BOARD, 0x080E0000);
 
 		private String name;
 		private int addr;
@@ -163,7 +163,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	}
 
 	public enum Answer {
-		UNKNOWN("UNKNOWN", (byte) -1), NULL("NULL", (byte) 0), ACK("ASK", (byte) 0x79), NACK("NACK", (byte) 0x1F);
+		UNKNOWN("UNKNOWN", (byte) -1), NULL("NULL", (byte) 0), ACK("ACK", (byte) 0x79), NACK("NACK", (byte) 0x1F);
 
 		private byte answer;
 		private String name;
@@ -262,31 +262,18 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		return microcontrollerSTM32;
 	}
 
-	@Override
-	public void notifyObservers() {
-		setChanged();
-		super.notifyObservers();
+	private MicrocontrollerSTM32() {
 	}
 
 	@Override
 	public void notifyObservers(Object obj) {
+		logger.trace(obj);
 		setChanged();
 		super.notifyObservers(obj);
 	}
 
-	private MicrocontrollerSTM32() {
-	}
-
-	private void notifyObservers(Status[] statuses) {
-		notifyObservers((Object) statuses);
-	}
-
-	private void notifyObservers(Status status) {
-		logger.entry(hasChanged());
-		notifyObservers((Object) status);
-	}
-
 	private boolean writeToFlashMemory() throws SerialPortException {
+		logger.entry();
 
 		int length = 256;
 		int readFrom = 0;
@@ -472,7 +459,9 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	private boolean sendCommand(Command command) throws SerialPortException {
 		logger.entry(command, waitTime);
 
-		logger.trace("Write ={}", ToHex.bytesToHex(command.toBytes()));
+		Level level = logger.getLevel();
+		if(level==Level.ALL || level==Level.TRACE)
+			logger.trace("Write ={}", ToHex.bytesToHex(command.toBytes()));
 		serialPort.writeBytes(command);
 
 		byte[] readBytes = serialPort.readBytes(1, waitTime);
@@ -537,18 +526,17 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	}
 
 	private static Thread runThread(Command command) throws InterruptedException {
+		logger.entry(command);
 		if (microcontrollerSTM32 != null) {
 			if (thread != null)
 				thread.join();
 			microcontrollerSTM32.command = command;
 			thread = new Thread(microcontrollerSTM32);
-			int priority = thread.getPriority();
-			if (priority > Thread.MIN_PRIORITY)
-				thread.setPriority(priority - 1);
+			thread.setPriority(Thread.MAX_PRIORITY);
 			thread.setDaemon(true);
 			thread.start();
 		}
-		return thread;
+		return logger.exit(thread);
 	}
 
 	public synchronized byte[] getReadBytes() {
@@ -568,9 +556,8 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		logger.entry(unitType);
 		Address address;
 		switch (unitType) {
-		case MicrocontrollerSTM32.BIAS_BOARD_R1:
-		case MicrocontrollerSTM32.BIAS_BOARD_R2:
-			address = Address.BIAS_R1;
+		case MicrocontrollerSTM32.BIAS_BOARD:
+			address = Address.BIAS;
 			break;
 		default:
 			address = Address.CONVERTER;
@@ -610,26 +597,31 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			synchronized (serialPort) {
 				switch (command) {
 				case CONNECT:
-					notifyObservers(new Status[] { Status.CONNECTING.setMessage("Connecting"), Status.BUTTON.setMessage("Stop") });
+					Status[] statuses = new Status[] { Status.CONNECTING.setMessage("Connecting"), Status.BUTTON.setMessage("Stop") };
+					logger.trace("CONNECT; notifyObservers:{}", (Object)statuses);
+					notifyObservers(statuses);
 					serialPort.writeBytes(command);
 					buffer = serialPort.readBytes(waitingByteCount);
 					break;
 				case ERASE:
+					logger.trace("ERASE");
 					eraseFlash();
 					break;
 				case EXTENDED_ERASE:
+					logger.trace("EXTENDED_ERASE");
 					break;
 				case GET:
+					logger.trace("GET");
 					break;
 				case READ_MEMORY:
+					logger.trace("READ_MEMORY");
 					readFlashMemory();
 					break;
 				case WRITE_MEMORY:
+					logger.trace("WRITE_MEMORY");
 					writeToFlashMemory();
 				case USER_COMMAND:
-					break;
-				default:
-					break;
+					logger.trace("USER_COMMAND");
 				}
 
 			}
@@ -637,8 +629,8 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			logger.catching(e);
 			// TODO Add Error Message
 		}
-		logger.trace("Obsorvers Count = {}", microcontrollerSTM32.countObservers());
-		microcontrollerSTM32.notifyObservers();
+		logger.trace("notifyObservers(); Obsorvers Count = {}", microcontrollerSTM32.countObservers());
+		notifyObservers();
 		logger.exit();
 	}
 }

@@ -6,9 +6,17 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 
+import org.junit.Before;
 import org.junit.Test;
 
 public class MicrocontrollerSTM32Test {
+
+	private MicrocontrollerSTM32 stm32;
+
+	@Before
+	public void init(){
+		stm32 = MicrocontrollerSTM32.getInstance();
+	}
 
 	@Test
 	public void test() {
@@ -16,4 +24,8 @@ public class MicrocontrollerSTM32Test {
 		System.out.println(divide);
 	}
 
+	@Test
+	public void test2() {
+		stm32.notifyObservers();
+	}
 }

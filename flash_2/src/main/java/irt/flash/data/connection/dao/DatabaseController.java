@@ -18,12 +18,15 @@ public class DatabaseController extends Thread {
 	public enum Action{ SET_PROFILE, UPDATE}
 
 	private Action action;
-	private Profile profile;
+	private String profile;
 	private String profileStr;
 	private static List<ProfileVariable> profileVariables;
 
 	public DatabaseController() {
 		setDaemon(true);
+		int priority = getPriority();
+		if(priority>Thread.MIN_PRIORITY)
+			setPriority(priority-1);
 		start();
 	}
 
@@ -42,9 +45,8 @@ public class DatabaseController extends Thread {
 						database.setProfile(profile);
 					break;
 				case UPDATE:
-					if(profileStr!=null){
-						Profile p = Profile.parseProfile(profileStr);
-						database.updateProfile(profile, p);
+					if(profileStr!=null && !profileStr.equals(profile)){
+						database.updateProfile(profile, profileStr);
 					}
 				}
 			}
@@ -63,10 +65,10 @@ public class DatabaseController extends Thread {
 		return database;
 	}
 
-	public synchronized void setProfile(Profile profile) {
+	public synchronized void setProfile(String profileStr) {
 		logger.entry();
 		action = Action.SET_PROFILE;
-		this.profile = profile;
+		this.profile = profileStr;
 		notify();
 		logger.exit();
 	}

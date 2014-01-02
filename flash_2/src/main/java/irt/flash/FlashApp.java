@@ -37,7 +37,7 @@ public class FlashApp extends JFrame {
 					FlashApp frame = new FlashApp();
 					frame.setVisible(true);
 				} catch (Exception e) {
-					e.printStackTrace();
+					logger.throwing(e);
 				}
 			}
 		});
@@ -62,7 +62,7 @@ public class FlashApp extends JFrame {
 			}
 		});
 
-		setMinimumSize(new Dimension(450, 250));
+		setMinimumSize(new Dimension(470, 250));
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setBounds(100, 100, 638, 840);
 		contentPane = new JPanel();

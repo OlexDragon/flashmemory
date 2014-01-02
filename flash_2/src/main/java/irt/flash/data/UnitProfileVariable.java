@@ -4,8 +4,8 @@ public class UnitProfileVariable extends ProfileVariable {
 
 	private long rowId;
 
-	public UnitProfileVariable(long rowId, long profileVariableId, String name, String description) {
-		super(profileVariableId, name, description);
+	public UnitProfileVariable(long rowId, long profileVariableId, String name, int scope, String description) {
+		super(profileVariableId, name, scope, description);
 		this.rowId = rowId;
 	}
 

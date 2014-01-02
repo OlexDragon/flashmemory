@@ -1,12 +1,14 @@
 package irt.flash.data.connection.dao;
 
-import irt.flash.data.Profile;
 import irt.flash.data.ProfileVariable;
 
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Observer;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
@@ -21,6 +23,7 @@ public class DatabaseController extends Thread {
 	private String profile;
 	private String profileStr;
 	private static List<ProfileVariable> profileVariables;
+	private static Map<String, ProfileVariable> profileVariableMap;
 
 	public DatabaseController() {
 		setDaemon(true);
@@ -55,6 +58,19 @@ public class DatabaseController extends Thread {
 		}
 	}
 
+	public static Map<String, ProfileVariable> getProfileVariablesMap() {
+		return profileVariableMap!=null ? profileVariableMap : setProfileVariableMap();
+	}
+
+	private static Map<String, ProfileVariable> setProfileVariableMap() {
+		profileVariableMap = new HashMap<String, ProfileVariable>();
+
+		for(ProfileVariable p:getProfileVariables())
+			profileVariableMap.put(p.getName(), p);
+			
+		return profileVariableMap;
+	}
+
 	public static List<ProfileVariable> getProfileVariables() {
 		return profileVariables!=null ? Collections.unmodifiableList(profileVariables) : null;
 	}
@@ -79,5 +95,9 @@ public class DatabaseController extends Thread {
 		this.profileStr = profileStr;
 		notify();
 		logger.exit();
+	}
+
+	public void addObserver(Observer observer) throws IOException {
+		Database.getInstance().addObserver(observer);
 	}
 }

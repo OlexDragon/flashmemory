@@ -2,6 +2,7 @@ package irt.flash.data.connection.dao;
 
 import irt.flash.data.ProfileVariable;
 import irt.flash.data.SerialNumberProfileVariable;
+import irt.flash.data.ToHex;
 import irt.flash.data.UnitProfileVariable;
 
 import java.io.IOException;
@@ -40,7 +41,7 @@ public class DatabaseSerialNumberProfile {
 	public void set(Connection connection, Long serialNumberId, Long variableId, String value) throws SQLException {
 
 		String sql = sqlProperties.getProperty("active_serial_number_profile_variable");
-		logger.entry(sql);
+		logger.entry(serialNumberId, variableId, value, sql);
 
 		List<SerialNumberProfileVariable> snpv = new ArrayList<>();
 
@@ -104,7 +105,7 @@ public class DatabaseSerialNumberProfile {
 
 		for(Object o:activeProfileVariables){
 			profileVariableId = getProfileVariableId(connection, (String)o);
-			vs.remove(new ProfileVariable(profileVariableId, (String) o, null));
+			vs.remove(new ProfileVariable(profileVariableId, (String) o, 0, null));
 			logger.trace("for loop: {}, {}", profileVariableId, (String) o);
 		}
 		logger.trace("left vs={}", vs);
@@ -130,6 +131,7 @@ public class DatabaseSerialNumberProfile {
 						profileVariables.add(new UnitProfileVariable(resultSet.getLong("row_id"),
 																	resultSet.getLong("id"),
 																	resultSet.getString("variable_name"),
+																	resultSet.getInt("scope"),
 																	resultSet.getString("description")));
 					}while(resultSet.next());
 				}
@@ -218,6 +220,7 @@ public class DatabaseSerialNumberProfile {
 						do{
 							profileVariables.add(new ProfileVariable(resultSet.getLong("id"),
 																	resultSet.getString("variable_name"),
+																	resultSet.getInt("scope"),
 																	resultSet.getString("description")));
 						}while(resultSet.next());
 					}
@@ -225,5 +228,112 @@ public class DatabaseSerialNumberProfile {
 			}
 		}
 		return profileVariables;
+	}
+
+	public String getNextMacAddress() throws ClassNotFoundException, SQLException, IOException {
+
+		String sql = sqlProperties.getProperty("all_mac_addresses");
+		logger.entry(sql);
+
+		String macAddress;
+		try (Connection connection = MySQLConnector.getConnection()) {
+			try (PreparedStatement statement = connection.prepareStatement(sql)) {
+				try(ResultSet resultSet = statement.executeQuery()){
+					List<Integer> macAddresses = new ArrayList<>();
+					while(resultSet.next()){
+						String string = resultSet.getString("mac_address");
+						logger.trace(string);
+						int lastIndexOf = string.lastIndexOf(':');
+						macAddresses.add(new Integer(ToHex.parseToByte(string.substring(++lastIndexOf))));
+					}
+					int tmp = 0;
+					if(!macAddresses.isEmpty()){
+						int size = macAddresses.size();
+						if (size < 256) {
+							int ma = macAddresses.get(0);
+							for (int i = 1; i < size; i++) {
+								tmp = ma + i;
+								logger.trace("{}+{}={}", ma, i, tmp);
+								if (!macAddresses.contains(tmp)) {
+									break;
+								}
+							}
+						}else
+							tmp = macAddresses.get(255);
+					}
+					macAddress = (String) Database.getDefaultProperties().getProperty("mac_address");
+					macAddress += ToHex.byteToHex((byte)tmp);
+				}
+			}
+		}
+		return logger.exit(macAddress);
+	}
+
+	//SELECT DISTINCT`values`.`value`FROM`lab`.`serial_number_profile`AS`values`
+	//JOIN
+	//`lab`.`serial_number_profile` AS `device_types`
+	//ON
+	//`device_types`.`id_serial_numbers` = `values`.`id_serial_numbers`
+	//AND
+	//`device_types`.`id_profile_variables` = ?
+	//AND
+	//`device_types`.`value` = ?
+	//JOIN
+	//`lab`.`serial_number_profile`AS`device_subtypes`
+	//ON`device_subtypes`.`id_serial_numbers`=`values`.`id_serial_numbers`
+	//AND
+	//`device_subtypes`.`id_profile_variables` = 5
+	//AND `device_subtypes`.`value` = ?
+	//WHERE
+	//`values`.`status`=TRUE
+	//AND
+	//`values`.`id_profile_variables` = 3
+	//ORDER BY `values`.`value`
+	public List<String> getValues(int deviceType, int deviceSubtype, int profileVariableId) throws ClassNotFoundException, SQLException, IOException {
+		List<String> values = null;
+
+		String sql = sqlProperties.getProperty("select_variables_for_device_type");
+		logger.entry(profileVariableId, deviceType, deviceSubtype, sql);
+
+		try(Connection connection = MySQLConnector.getConnection()){
+			try(PreparedStatement statement = connection.prepareStatement(sql)){
+				statement.setInt(1, deviceType);
+				statement.setInt(2, deviceSubtype);
+				statement.setInt(3, profileVariableId);
+				try(ResultSet resultSet = statement.executeQuery()){
+					if(resultSet.next()){
+						values = new ArrayList<>();
+						do{
+							values.add(resultSet.getString("value"));
+						}while(resultSet.next());
+					}
+				}
+			}
+		}
+		return logger.exit(values);
+	}
+
+	public List<String> getValues(int profileVariableIdToGet, int valueProfileVariableId, String value) throws ClassNotFoundException, SQLException, IOException {
+		List<String> values = null;
+
+		String sql = sqlProperties.getProperty("select_value_where_value");
+		logger.entry(profileVariableIdToGet, valueProfileVariableId, value, sql);
+
+		try(Connection connection = MySQLConnector.getConnection()){
+			try(PreparedStatement statement = connection.prepareStatement(sql)){
+				statement.setInt(1, profileVariableIdToGet);
+				statement.setInt(2, valueProfileVariableId);
+				statement.setString(3, value);
+				try(ResultSet resultSet = statement.executeQuery()){
+					if(resultSet.next()){
+						values = new ArrayList<>();
+						do{
+							values.add(resultSet.getString("value"));
+						}while(resultSet.next());
+					}
+				}
+			}
+		}
+		return logger.exit(values);
 	}
 }

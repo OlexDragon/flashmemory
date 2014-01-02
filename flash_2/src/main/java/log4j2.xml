@@ -8,27 +8,31 @@
 		<RollingFile name="DumpFile" fileName="${sys:user.home}/irt/Flash.log"
 			filePattern="${sys:user.home}/irt/Flash/$${date:yyyy-MM}/Flash-%d{yyyy-MM-dd}-%i.log.gz"
 			bufferedIO="folse">
-			<PatternLayout pattern="%d [%t] %C{2} %M (%F:%L) %-5p - %m%xEx%n" />
+			<PatternLayout pattern="%-5p %d [%t] %C{2} %M (%F:%L) - %m%xEx%n" />
 			<Policies>
-				<SizeBasedTriggeringPolicy size="500 MB" />
+				<SizeBasedTriggeringPolicy size="200 MB" />
 			</Policies>
 			<DefaultRolloverStrategy max="10" />
 		</RollingFile>
 	</Appenders>
 
 	<Loggers>
-	<logger name="irt.flash.data.connection.FlashSerialPort" level="WARN" />
-	<logger name="irt.flash.presentation.panel.ConnectionPanel" level="ALL" />
-	<logger name="irt.flash.data.connection.FlashConnector" level="WARN" />
-	<logger name="irt.flash.data.connection.MicrocontrollerSTM32" level="All" />
-	<logger name="irt.flash.presentation.dialog.MessageDialog" level="WARN" />
-	<logger name="irt.flash.data.Profile" level="WARN" />
-	<logger name="irt.flash.data.connection.dao.Database" level="WARN" />
-	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberProfile" level="WARN" />
-	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumbers" level="WARN" />
-	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberTable" level="WARN" />
-	<logger name="irt.flash.data.connection.dao.DatabaseController" level="WARN" />
-	<logger name="irt.flash.data.Profile" level="WARN" />
+	<logger name="irt.flash.data.connection.FlashSerialPort" level="INFO" />
+	<logger name="irt.flash.presentation.panel.ConnectionPanel" level="INFO" />
+	<logger name="irt.flash.presentation.panel.EditProfilePanel" level="INFO" />
+	<logger name="irt.flash.presentation.panel.edit_profile.ProductDescriptionPanel" level="INFO" />
+	<logger name="irt.flash.presentation.panel.edit_profile.SystemNamePanel" level="INFO" />
+	<logger name="irt.flash.data.connection.FlashConnector" level="INFO" />
+	<logger name="irt.flash.data.connection.MicrocontrollerSTM32" level="INFO" />
+	<logger name="irt.flash.presentation.dialog.MessageDialog" level="all" />
+	<logger name="irt.flash.presentation.dialog.MessageDialog$DialogWorker" level="all" />
+	<logger name="irt.flash.data.Profile" level="INFO" />
+	<logger name="irt.flash.data.connection.dao.Database" level="INFO" />
+	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberProfile" level="error" />
+	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumbers" level="error" />
+	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberTable" level="error" />
+	<logger name="irt.flash.data.connection.dao.DatabaseController" level="error" />
+	<logger name="irt.flash.data.Profile" level="INFO" />
 
 		<Root level="INFO">
 			<AppenderRef ref="STDOUT" />

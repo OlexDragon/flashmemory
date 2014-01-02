@@ -7,6 +7,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
@@ -42,7 +44,6 @@ public class DatabaseSerialNumbers {
 	public int update(Connection connection, SerialNumber serialNumber) throws SQLException {
 
 		String sql = sqlProperties.getProperty("update_serial_number");
-		logger.trace(sql);
 
 		int executeUpdate;
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -50,6 +51,7 @@ public class DatabaseSerialNumbers {
 			statement.setLong(2, serialNumber.getId());
 			executeUpdate = statement.executeUpdate();
 		}
+		logger.info("serialNumber={}, sql={}, executeUpdate={}", serialNumber, sql);
 		return executeUpdate;
 	}
 
@@ -92,27 +94,58 @@ public class DatabaseSerialNumbers {
 		return logger.exit(serialNumber);
 	}
 
-	public String getSerialNumbersStartWith(String yerWeek) throws ClassNotFoundException, SQLException, IOException {
+	public String getNextSerialNumber(String yerWeek) throws ClassNotFoundException, SQLException, IOException {
 		logger.entry(yerWeek);
 
-		List<SerialNumber> serialNumbers = null;
-		String sql = sqlProperties.getProperty("select_serial_number");
+		String serialNumber = null;
+		String like = "IRT-"+yerWeek+'%';
+		logger.trace("LIKE'{}'", like);
+
+		String sql = sqlProperties.getProperty("new_serial_number");
 		logger.trace(sql);
 
 		try(Connection connection = MySQLConnector.getConnection()){
 			try (PreparedStatement statement = connection.prepareStatement(sql)) {
-			
+
+				statement.setString(1, like);
+				statement.setString(2, like);
+
+				try(ResultSet resultSet = statement.executeQuery()){
+					List<Integer> l = new ArrayList<>();
+
+					while(resultSet.next()){
+						String string = resultSet.getString("serial_number");
+						logger.trace("while(resultSet.next())={}", string);
+						l.add(Integer.parseInt(string.replaceAll("\\D", "").substring(yerWeek.length())));
+					}
+
+					logger.trace(l);
+					serialNumber = "IRT-"+getSerialNumber(yerWeek, l);
+				}
 			}
 		}
-			return null;
+			return logger.exit(serialNumber);
+	}
+
+	private String getSerialNumber(String yerWeek, List<Integer> l) {
+		String serialNumber = null;
+
+		if(l.isEmpty())
+			serialNumber = yerWeek + new DecimalFormat("000").format(1);
+		else
+			for(int i=1; i<1000; i++)
+				if(!l.contains(i)){
+					serialNumber = yerWeek + new DecimalFormat("000").format(i);
+					break;
+				}
+
+		return serialNumber;
 	}
 
 	public boolean profileIsChanged(Connection connection, long serialNumberId, String profileStr) throws SQLException {
-		logger.entry(serialNumberId, profileStr);
 
 		boolean isChanged = false;
 		String sql = sqlProperties.getProperty("profile_have_been_changed");
-		logger.trace(sql);
 
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
 			statement.setLong(1, serialNumberId);
@@ -121,20 +154,21 @@ public class DatabaseSerialNumbers {
 				isChanged = !resultSet.next();
 			}
 		}
-
-		return logger.exit(isChanged);
+		logger.info("serialNumberId={}, profileStr={}, isChanged=>{}, sql={}", serialNumberId, profileStr, isChanged, sql);
+		return isChanged;
 	}
 
-	public void setProfile(Connection connection, long serialNumberId, String profileStr) throws SQLException {
-		logger.entry(serialNumberId, profileStr);
+	public int setProfile(Connection connection, long serialNumberId, String profileStr) throws SQLException {
 		
 		String sql = sqlProperties.getProperty("set_profile");
-		logger.trace(sql);
 
+		int executeUpdate = 0;
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
 			statement.setLong(2, serialNumberId);
 			statement.setString(1, profileStr);
-			statement.executeQuery();
+			executeUpdate = statement.executeUpdate();
 		}
+		logger.info("serialNumberId={}, profileStr={}, executeUpdate=>{}, sql={}", serialNumberId, profileStr, executeUpdate, sql);
+		return executeUpdate;
 	}
 }

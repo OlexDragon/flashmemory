@@ -5,6 +5,7 @@ import irt.flash.data.connection.MicrocontrollerSTM32.Status;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dialog;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Rectangle;
@@ -12,30 +13,26 @@ import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.ActionListener;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 
+import javax.swing.GroupLayout;
+import javax.swing.GroupLayout.Alignment;
 import javax.swing.JButton;
 import javax.swing.JDialog;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JProgressBar;
 import javax.swing.JTextArea;
+import javax.swing.LayoutStyle.ComponentPlacement;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 
-import javax.swing.GroupLayout;
-import javax.swing.GroupLayout.Alignment;
-import javax.swing.JProgressBar;
-import javax.swing.JLabel;
-import javax.swing.LayoutStyle.ComponentPlacement;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
-
-import java.awt.Dimension;
-
-public class MessageDialog extends JDialog implements Runnable{
+public class MessageDialog extends JDialog{
 	private static final long serialVersionUID = -2685615105998432650L;
 
 	private final Logger logger = (Logger) LogManager.getLogger();
@@ -52,7 +49,7 @@ public class MessageDialog extends JDialog implements Runnable{
 
 	private JLabel lblProgress;
 
-	private List<Object> message = new ArrayList<>();
+	private DialogWorker dialogWorker;
 
 	public static MessageDialog getInstance(Window owner){
 		if(messageDialog==null)
@@ -120,57 +117,6 @@ public class MessageDialog extends JDialog implements Runnable{
 			}
 			mainPanel.add(buttonPane, BorderLayout.SOUTH);
 		}
-		Thread t = new Thread(this);
-		int priority = t.getPriority();
-		if(priority>Thread.MIN_PRIORITY)
-			t.setPriority(priority-1);
-		t.setDaemon(true);
-		t.start();
-	}
-
-	private synchronized void resize() {
-		logger.entry();
-		pack();
-		Rectangle bounds = getOwner().getBounds();
-		Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-
-		double appX = bounds.getX();
-		double appWidth = bounds.getWidth();
-		double tmp = screenSize.getWidth()-(appX+appWidth);
-		if(tmp<0)
-			appWidth = appWidth + tmp;
-		if(appX<0)
-			appX = 0;
-		int x = (int) (appX+(appWidth-getWidth())/2);
-
-		double appY = bounds.getY();
-		double appHeight = bounds.getHeight();
-		tmp = screenSize.getHeight()-appY-appHeight;
-		if(tmp<0)
-			appHeight = appHeight + tmp;
-		int y = (int) (appY+(appHeight-getHeight())/2);
-
-		logger.trace("Location: x={}, y={}", x, y); 
-		setLocation(x, y);
-
-		if(!isVisible())//Set Visible
-			SwingUtilities.invokeLater(new Runnable() { @Override public void run() { logger.trace("setVisible(true)"); setVisible(true); dispose(); }
-		});
-
-		logger.exit();
-	}
-
-	@Override
-	public void run() {
-		while(true){
-			if(message.isEmpty()){
-				logger.trace("wait();");
-				synchronized (this) { try { wait(); } catch (InterruptedException e) { logger.catching(e); } }
-			}
-			logger.trace("SET MESSAGE: {}", message);
-			set(message.get(0));
-			message.remove(0);
-		}
 	}
 
 	public String getButtonText(){
@@ -186,81 +132,162 @@ public class MessageDialog extends JDialog implements Runnable{
 	}
 
 	public synchronized void setMessage(Object message){
-		logger.entry(message);
-		this.message.add(message);
-		notify();
-		logger.exit();
+		logger.trace(message);
+
+		if(dialogWorker!=null)
+			dialogWorker.cancel(true);
+
+		dialogWorker = new DialogWorker(message);
+		dialogWorker.execute();
 	}
 
-	private synchronized <T> void set(T message) {
-		logger.entry(message);
-		if(message!=null){
-			if(message instanceof Status[])
-				setMessage((Status[])message);
-			else if(message instanceof Status)
-				setMessage((Status)message);
-			else if(message instanceof BigDecimal)
-				setProgressBar((BigDecimal)message);
-			else if(message instanceof String)
-				setMessage((String)message);
-		}else if(isVisible()){
-			logger.trace("setVisible(false); Text={}", textArea.getText());
-			panelProgressBar.setVisible(false);
-			setVisible(false);
+	//********************************************************************
+	private class DialogWorker extends SwingWorker<Object, Void>{
+
+		private final Logger logger = (Logger) LogManager.getLogger();
+
+		private Object message;
+
+		public DialogWorker(Object message){
+			logger.trace("DialogWorker(Object message={})", message);
+			this.message = message;
 		}
-		logger.exit();
-	}
 
-	private void setProgressBar(BigDecimal bigDecimal) {
-		logger.entry(bigDecimal);
-		int progress = bigDecimal.multiply(new BigDecimal(100)).intValueExact();
-		progressBar.setValue(progress);
-		lblProgress.setText(bigDecimal.toString()+" %");
-		if(!panelProgressBar.isVisible()){
-			panelProgressBar.setVisible(true);
-			resize();
+		@Override
+		protected Object doInBackground() throws Exception {
+			set(message);
+			return null;
 		}
-		logger.exit();
-	}
 
-	private void setMessage(String text) {
-		logger.entry(text);
-		textArea.setText(text);
-		button.setText("Ok");
-		resize();
-		logger.exit();
-	}
-
-	private void setMessage(Status[] statuses) {
-		logger.entry((Object)statuses);
-
-		for (Status s : statuses)
-				setMessage(s);
-		logger.exit();
-	}
-
-	private void setMessage(Status status) {
-		logger.entry(status);
-		switch (status) {
-		case BUTTON:
-			button.setText(status.getMessage());
-			break;
-		case ERROR:
-			String message = status.getMessage();
-			logger.trace(message);
-			textArea.setText(message);
-			button.setText("Ok");
-			resize();
-			break;
-		default:
-			message = status.getMessage();
-			if (message != null) {
-				textArea.setText(message);
-				resize();
-			} else if (isVisible())
+		private synchronized <T> void set(T message) {
+			if(message!=null){
+				if(message instanceof Status[]){
+					logger.trace("(Status[])message={}", message);
+					setMessage((Status[])message);
+				}else if(message instanceof Status){
+					logger.trace("(Status)message={}", message);
+					setMessage((Status)message);
+				}else if(message instanceof BigDecimal){
+					logger.trace("(BigDecimal)message={}", message);
+					setProgressBar((BigDecimal)message);
+				}else if(message instanceof String){
+					logger.trace("(String)message={}", message);
+					setMessage((String)message);
+				}else
+					logger.warn("Not use message={}", message);
+			}else if(isVisible()){
+				logger.trace("setVisible(false); Text={}", textArea.getText());
+				panelProgressBar.setVisible(false);
 				setVisible(false);
+			}
 		}
 
-		logger.exit();
+		private void setMessage(String text) {
+			logger.entry(text);
+
+			if (!isCancelled()) {
+				textArea.setText(text);
+				if (isCancelled()) {
+					button.setText("Ok");
+					if (!isCancelled())
+						resize();
+				}
+			}
+
+			logger.exit();
+		}
+
+		private void setMessage(Status[] statuses) {
+			logger.entry((Object)statuses);
+
+			for (Status s : statuses){
+				if(isCancelled())
+					break;
+				else
+					setMessage(s);
+			}
+			logger.exit();
+		}
+
+		private void setMessage(Status status) {
+			logger.entry(status);
+
+			switch (status) {
+			case BUTTON:
+				button.setText(status.getMessage());
+				break;
+			case ERROR:
+				String message = status.getMessage();
+				logger.trace(message);
+				textArea.setText(message);
+				button.setText("Ok");
+				resize();
+				break;
+			default:
+				message = status.getMessage();
+				if (message != null) {
+					textArea.setText(message);
+					resize();
+				} else if (isVisible())
+					setVisible(false);
+			}
+
+			logger.exit();
+		}
+
+		private void setProgressBar(BigDecimal bigDecimal) {
+			logger.entry(bigDecimal);
+			int progress = bigDecimal.multiply(new BigDecimal(100)).intValueExact();
+			progressBar.setValue(progress);
+			lblProgress.setText(bigDecimal.toString()+" %");
+			if(!panelProgressBar.isVisible()){
+				panelProgressBar.setVisible(true);
+				resize();
+			}
+			logger.exit();
+		}
+
+		private synchronized void resize() {
+			logger.entry();
+			pack();
+			if (!isCancelled()) {
+				Rectangle bounds = getOwner().getBounds();
+				Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+
+				double appX = bounds.getX();
+				double appWidth = bounds.getWidth();
+				double tmp = screenSize.getWidth() - (appX + appWidth);
+				if (tmp < 0)
+					appWidth = appWidth + tmp;
+				if (appX < 0)
+					appX = 0;
+				int x = (int) (appX + (appWidth - getWidth()) / 2);
+
+				double appY = bounds.getY();
+				double appHeight = bounds.getHeight();
+				tmp = screenSize.getHeight() - appY - appHeight;
+				if (tmp < 0)
+					appHeight = appHeight + tmp;
+				int y = (int) (appY + (appHeight - getHeight()) / 2);
+
+				if (!isCancelled()) {
+					logger.trace("Location: x={}, y={}", x, y);
+					setLocation(x, y);
+
+					if (!isVisible())// Set Visible
+						SwingUtilities.invokeLater(new Runnable() {
+							@Override
+							public void run() {
+								if (!isCancelled()) {
+									logger.trace("setVisible(true)");
+									setVisible(true);
+									dispose();
+								}
+							}
+						});
+				}
+			}
+			logger.exit();
+		}
 	}
 }

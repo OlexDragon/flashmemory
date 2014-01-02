@@ -1,6 +1,5 @@
 package irt.flash.presentation.panel;
 
-import irt.flash.data.Profile;
 import irt.flash.data.ToHex;
 import irt.flash.data.connection.FlashConnector;
 import irt.flash.data.connection.MicrocontrollerSTM32;
@@ -29,6 +28,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Observable;
 import java.util.Observer;
@@ -51,6 +51,7 @@ import javax.swing.JTabbedPane;
 import javax.swing.JTextPane;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.SwingConstants;
+import javax.swing.SwingWorker;
 import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -88,7 +89,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 	private JTextPane textPane;
 	private JPopupMenu popupMenu;
-	private JMenuItem mntmUploadFromFile;
+	private JMenuItem mntmUploadProfileFromFile;
 	private JMenuItem mntmUploadProgram;
 	private JMenuItem mntmUploadProgramFrom;
 	private JMenuItem mntmEraseProfileMemory;
@@ -110,21 +111,27 @@ public class ConnectionPanel extends JPanel implements Observer {
 			
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				String buttonText = dialog.getButtonText();
-				logger.entry(buttonText);
-				switch(buttonText){
-				case "Ok":
-					dialog.setMessage((Status)null);
-					break;
-				default:
-					System.exit(0);
-				}
+				new SwingWorker<Void, Void>(){
+
+					@Override
+					protected Void doInBackground() throws Exception {
+						String buttonText = dialog.getButtonText();
+						logger.entry(buttonText);
+						switch(buttonText){
+						case "Ok":
+							dialog.setMessage((Status)null);
+							break;
+						default:
+							System.exit(0);
+						}
+						return null;
+					}
+				}.execute();
 			}
 		});
 
 		addAncestorListener(new AncestorListener() {
 			public void ancestorAdded(AncestorEvent ancestorEvent) {
-				logger.entry();
 				DefaultComboBoxModel<String> defaultComboBoxModel = new DefaultComboBoxModel<String>(SerialPortList.getPortNames());
 				defaultComboBoxModel.insertElementAt(SELECT_SERIAL_PORT, 0);
 				comboBoxComPort.setModel(defaultComboBoxModel);
@@ -133,14 +140,20 @@ public class ConnectionPanel extends JPanel implements Observer {
 					@Override
 					public void itemStateChanged(ItemEvent itemEvent) {
 						if(itemEvent.getStateChange()==ItemEvent.SELECTED){
-							disconnect();
-							prefs.put(SERIAL_PORT, comboBoxComPort.getSelectedItem().toString());
-							setButtons();
+							new SwingWorker<Void, Void>() {
+
+								@Override
+								protected Void doInBackground() throws Exception {
+									disconnect();
+									prefs.put(SERIAL_PORT, comboBoxComPort.getSelectedItem().toString());
+									setButtons();
+									return null;
+								}
+							}.execute();
 						}
 					}
 				});
 				setButtons();
-				logger.exit();
 			}
 			public void ancestorMoved(AncestorEvent ancestorEvent) { }
 			public void ancestorRemoved(AncestorEvent ancestorEvent) { }
@@ -149,31 +162,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		btnConnect = new JButton(CONNECT);
 		btnConnect.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent actionEvent) {
-				String text = btnConnect.getText();
-				logger.entry(text);
-				try {
-					switch(text){
-					case CONNECT:
-						logger.trace(CONNECT);
-						btnConnect.setText("Cancel");
-						FlashConnector.connect();
-						textPane.setText("");
-						break;
-					case DISCONNECT:
-						logger.trace("disconnect");
-						disconnect();
-						setLabel(lblConnection, PRESS_CONNECT_BUTTON, Color.YELLOW);
-						break;
-					default:
-						logger.trace("default");
-					}
-				} catch (Exception e) {
-					logger.catching(e);
-					JOptionPane.showMessageDialog(ConnectionPanel.this, e.getLocalizedMessage());
-					disconnect();
-					setLabel(lblConnection, PRESS_CONNECT_BUTTON, Color.YELLOW);
-				}
-				logger.exit();
+				new ConnectionWorker().execute();
 			}
 		});
 		btnConnect.setFont(new Font("Tahoma", Font.BOLD, 14));
@@ -182,11 +171,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		btnRead = new JButton("Read");
 		btnRead.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-				try {
-					MicrocontrollerSTM32.read((String) comboBoxUnitType.getSelectedItem());
-				} catch (InterruptedException e) {
-					logger.catching(e);
-				}
+				new ReaderWorker().execute();
 			}
 		});
 		btnRead.setMargin(new Insets(0, 0, 0, 0));
@@ -210,10 +195,25 @@ public class ConnectionPanel extends JPanel implements Observer {
 		comboBoxUnitType.addItemListener(new ItemListener() {
 			public void itemStateChanged(ItemEvent itemEvent) {
 				if(itemEvent.getStateChange()==ItemEvent.SELECTED){
-					prefs.put("Unit Type", comboBoxUnitType.getSelectedItem().toString());
-					setButtons();
-					boolean isSelectes = comboBoxUnitType.getSelectedIndex()>0;
-					setLabel(lblUnitType, isSelectes ? "Unit Type" : "Select The Unit Type", isSelectes ? Color.GREEN : Color.YELLOW);
+					new SwingWorker<Void, Void>(){
+
+						@Override
+						protected Void doInBackground() throws Exception {
+							String selectedItem = (String) comboBoxUnitType.getSelectedItem();
+							prefs.put("Unit Type", selectedItem);
+							setButtons();
+							boolean isSelectes = comboBoxUnitType.getSelectedIndex()>0;
+							setLabel(lblUnitType, isSelectes ? "Unit Type" : "Select The Unit Type", isSelectes ? Color.GREEN : Color.YELLOW);
+
+							try {
+								editProfile.setUnitType(selectedItem);
+							} catch (ClassNotFoundException | SQLException | IOException e) {
+								logger.catching(e);
+							}
+							return null;
+						}
+						
+					}.execute();
 				}
 			}
 		});
@@ -230,17 +230,17 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 		GroupLayout groupLayout = new GroupLayout(this);
 		groupLayout.setHorizontalGroup(
-			groupLayout.createParallelGroup(Alignment.TRAILING)
-				.addGroup(Alignment.LEADING, groupLayout.createSequentialGroup()
+			groupLayout.createParallelGroup(Alignment.LEADING)
+				.addGroup(groupLayout.createSequentialGroup()
 					.addContainerGap()
 					.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
 						.addGroup(groupLayout.createSequentialGroup()
-							.addComponent(tabbedPane, GroupLayout.DEFAULT_SIZE, 440, Short.MAX_VALUE)
+							.addComponent(tabbedPane, GroupLayout.PREFERRED_SIZE, 430, Short.MAX_VALUE)
 							.addContainerGap())
 						.addGroup(groupLayout.createSequentialGroup()
 							.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
-								.addComponent(lblUnitType, GroupLayout.DEFAULT_SIZE, 218, Short.MAX_VALUE)
-								.addComponent(lblConnection, GroupLayout.DEFAULT_SIZE, 218, Short.MAX_VALUE))
+								.addComponent(lblUnitType, GroupLayout.DEFAULT_SIZE, 343, Short.MAX_VALUE)
+								.addComponent(lblConnection, GroupLayout.DEFAULT_SIZE, 343, Short.MAX_VALUE))
 							.addPreferredGap(ComponentPlacement.RELATED)
 							.addGroup(groupLayout.createParallelGroup(Alignment.TRAILING)
 								.addGroup(groupLayout.createSequentialGroup()
@@ -267,7 +267,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 						.addComponent(comboBoxUnitType, GroupLayout.PREFERRED_SIZE, 28, GroupLayout.PREFERRED_SIZE)
 						.addComponent(lblUnitType, GroupLayout.PREFERRED_SIZE, 28, GroupLayout.PREFERRED_SIZE))
 					.addPreferredGap(ComponentPlacement.RELATED)
-					.addComponent(tabbedPane, GroupLayout.DEFAULT_SIZE, 213, Short.MAX_VALUE)
+					.addComponent(tabbedPane, GroupLayout.DEFAULT_SIZE, 205, Short.MAX_VALUE)
 					.addContainerGap())
 		);
 		groupLayout.linkSize(SwingConstants.VERTICAL, new Component[] {btnConnect, comboBoxComPort, lblConnection});
@@ -283,149 +283,177 @@ public class ConnectionPanel extends JPanel implements Observer {
 		popupMenu = new JPopupMenu();
 		addPopup(textPane, popupMenu);
 		
-		mntmUploadFromFile = new JMenuItem("Upload Profile From File...");
-		mntmUploadFromFile.addActionListener(new ActionListener() {
+		mntmUploadProfileFromFile = new JMenuItem("Upload Profile From File...");
+		mntmUploadProfileFromFile.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent actionEvent) {
-				if (isConnected()) {
-					if(textPane.getText().isEmpty())
-						dialog.setMessage("First Have to Read Profile.");
-					else
-					try {
-						uploadFromFile();
-					} catch (Exception e) {
-						logger.catching(e);
-					}
-				}
-			}
+				new SwingWorker<Void, Void>() {
 
-			private void uploadFromFile() throws FileNotFoundException, InterruptedException {
-
-				JFileChooser fc = new JFileChooser();
-				fc.setMultiSelectionEnabled(false);
-				fc.setDialogTitle("Open Profile");
-
-				FileNameExtensionFilter fileNameExtensionFilter = new FileNameExtensionFilter("Bin files(bin)", "bin");
-				fc.addChoosableFileFilter(fileNameExtensionFilter);
-				fc.setFileFilter(fileNameExtensionFilter);
-
-				String pathStr = prefs.get("profilePath", null);
-				Path p = null;
-				if(pathStr!=null){
-					p = Paths.get(pathStr);
-					fc.setSelectedFile(p.toFile());
-				}
-
-				if(fc.showSaveDialog(ConnectionPanel.this)==JFileChooser.APPROVE_OPTION ){
-					File file = fc.getSelectedFile();
-					String path = file.getAbsolutePath();
-					if(p==null || !path.equals(pathStr)) {
-						prefs.put("profilePath", path);
+					@Override
+					protected Void doInBackground() throws Exception {
+						if (isConnected()) {
+							if(textPane.getText().isEmpty())
+								dialog.setMessage("First Have to Read Profile.");
+							else
+							try {
+								uploadFromFile();
+							} catch (Exception e) {
+								logger.catching(e);
+							}
+						}
+						return null;
 					}
 
-					String fileContents = new String();
-					try(Scanner scanner = new Scanner(file)) {
-						while(scanner.hasNextLine())
-							fileContents += scanner.nextLine()+"\n";
-					}
-					databaseController.update(fileContents);
+					private void uploadFromFile() throws FileNotFoundException, InterruptedException {
 
-					if(!fileContents.isEmpty()){
-						fileContents += '\0';
-						MicrocontrollerSTM32.write((String) comboBoxUnitType.getSelectedItem(), fileContents);
+						JFileChooser fc = new JFileChooser();
+						fc.setMultiSelectionEnabled(false);
+						fc.setDialogTitle("Open Profile");
+
+						FileNameExtensionFilter fileNameExtensionFilter = new FileNameExtensionFilter("Bin files(bin)", "bin");
+						fc.addChoosableFileFilter(fileNameExtensionFilter);
+						fc.setFileFilter(fileNameExtensionFilter);
+
+						String pathStr = prefs.get("profilePath", null);
+						Path p = null;
+						if(pathStr!=null){
+							p = Paths.get(pathStr);
+							fc.setSelectedFile(p.toFile());
+						}
+
+						if(fc.showSaveDialog(ConnectionPanel.this)==JFileChooser.APPROVE_OPTION ){
+							File file = fc.getSelectedFile();
+							String path = file.getAbsolutePath();
+							if(p==null || !path.equals(pathStr)) {
+								prefs.put("profilePath", path);
+							}
+
+							String fileContents = new String();
+							try(Scanner scanner = new Scanner(file)) {
+								while(scanner.hasNextLine())
+									fileContents += scanner.nextLine()+"\n";
+							}
+							databaseController.update(fileContents);
+
+							if(!fileContents.isEmpty()){
+								fileContents += '\0';
+								MicrocontrollerSTM32.write((String) comboBoxUnitType.getSelectedItem(), fileContents);
+							}
+						}
 					}
-				}
+				}.execute();
 			}
 		});
 		
 		mntmEraseProfileMemory = new JMenuItem("Erase Profile Memory");
 		mntmEraseProfileMemory.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent actionEvent) {
-				if(FlashConnector.isConnected()){
-					if(btnRead.isEnabled()){
-						try {
-							dialog.setMessage(Status.ERASE.setMessage("Memory Erasing"));
-							MicrocontrollerSTM32.erase((String) comboBoxUnitType.getSelectedItem());
-						} catch (Exception e) {
-							logger.catching(e);
-						}
-					}else
-						JOptionPane.showMessageDialog(ConnectionPanel.this, "The Unit Type Is Not Selected.");
-				}else
-					JOptionPane.showMessageDialog(ConnectionPanel.this, "The Unit Is Not Connected.");
+				new SwingWorker<Void, Void>() {
+
+					@Override
+					protected Void doInBackground() throws Exception {
+						if(FlashConnector.isConnected()){
+							if(btnRead.isEnabled()){
+								try {
+									dialog.setMessage(Status.ERASE.setMessage("Memory Erasing"));
+									MicrocontrollerSTM32.erase((String) comboBoxUnitType.getSelectedItem());
+								} catch (Exception e) {
+									logger.catching(e);
+								}
+							}else
+								JOptionPane.showMessageDialog(ConnectionPanel.this, "The Unit Type Is Not Selected.");
+						}else
+							JOptionPane.showMessageDialog(ConnectionPanel.this, "The Unit Is Not Connected.");
+						return null;
+					}
+				}.execute();
 			}
 		});
 		popupMenu.add(mntmEraseProfileMemory);
-		popupMenu.add(mntmUploadFromFile);
+		popupMenu.add(mntmUploadProfileFromFile);
 		
 		mntmUploadProgram = new JMenuItem("Upload Program");
 		mntmUploadProgram.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent actionEvent) {
+				new SwingWorker<Void, Void>() {
 
-				if (isConnected()) {
-					if(textPane.getText().isEmpty())
-						dialog.setMessage("First Have to Read Profile.");
-					else {
-						String path = getProgramPath();
+					@Override
+					protected Void doInBackground() throws Exception {
+						if (isConnected()) {
+							if(textPane.getText().isEmpty())
+								dialog.setMessage("First Have to Read Profile.");
+							else {
+								String path = getProgramPath();
 
-						logger.trace("path={}", path);
+								logger.trace("path={}", path);
 
-						File file = new File(path);
-						if (file.exists()) {
-							writeProgram(file);
-						} else
-							dialog.setMessage("The File do not exist.");
+								File file = new File(path);
+								if (file.exists()) {
+									writeProgram(file);
+								} else
+									dialog.setMessage("The File do not exist.");
+							}
+						}
+						return null;
 					}
-				}
+				}.execute();
 			}
 		});
 		
 		mntmSaveProfileTo = new JMenuItem("Save Profile to File...");
 		mntmSaveProfileTo.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent actionEvent) {
-				if(!textPane.getText().isEmpty()){
+				new SwingWorker<Void, Void>() {
 
-					@SuppressWarnings("serial")
-					JFileChooser fc = new JFileChooser(){
-					    @Override
-					    public void approveSelection(){
-					        File f = getSelectedFile();
-					        if(f.exists() && getDialogType() == SAVE_DIALOG){
-					            switch(JOptionPane.showConfirmDialog(this,"The File '"+f.getName()+"' already exists.\nDo you want to replace it?", "Existing file", JOptionPane.YES_NO_OPTION)){
-					                case JOptionPane.YES_OPTION:
-					                    super.approveSelection();
-					            }
-					        }else
-			                    super.approveSelection();
-					    }
-					};
-					fc.setDialogTitle("Save Profile");
-					fc.setMultiSelectionEnabled(false);
+					@Override
+					protected Void doInBackground() throws Exception {
+						if(!textPane.getText().isEmpty()){
 
-					FileNameExtensionFilter fileNameExtensionFilter = new FileNameExtensionFilter("Bin files(bin)", "bin");
-					fc.addChoosableFileFilter(fileNameExtensionFilter);
-					fc.setFileFilter(fileNameExtensionFilter);
+							@SuppressWarnings("serial")
+							JFileChooser fc = new JFileChooser() {
+								@Override
+								public void approveSelection() {
+									File f = getSelectedFile();
+									if (f.exists() && getDialogType() == SAVE_DIALOG) {
+										switch (JOptionPane.showConfirmDialog(this, "The File '" + f.getName() + "' already exists.\nDo you want to replace it?",
+												"Existing file", JOptionPane.YES_NO_OPTION)) {
+										case JOptionPane.YES_OPTION:
+											super.approveSelection();
+										}
+									} else
+										super.approveSelection();
+								}
+							};
+							fc.setDialogTitle("Save Profile");
+							fc.setMultiSelectionEnabled(false);
 
-					String pathStr = prefs.get("profile_path", null);
-					if(pathStr!=null)
-						fc.setSelectedFile(Paths.get(pathStr).getParent().resolve("profile.bin").toFile());
+							FileNameExtensionFilter fileNameExtensionFilter = new FileNameExtensionFilter("Bin files(bin)", "bin");
+							fc.addChoosableFileFilter(fileNameExtensionFilter);
+							fc.setFileFilter(fileNameExtensionFilter);
 
-					if(fc.showSaveDialog(null)==JFileChooser.APPROVE_OPTION ){
+							String pathStr = prefs.get("profile_path", null);
+							if (pathStr != null)
+								fc.setSelectedFile(Paths.get(pathStr).getParent().resolve("profile.bin").toFile());
 
-						File selectedFile = fc.getSelectedFile();
-						String absolutePath = selectedFile.getAbsolutePath();
-						if(pathStr==null || !pathStr.equals(absolutePath))
-							prefs.put("profile_path", absolutePath);
+							if (fc.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
 
-						try(BufferedWriter out = new BufferedWriter(new FileWriter(selectedFile))) {
-							textPane.write(out);
-							out.flush();
-						} catch(IOException e) {
-							logger.catching(e);
-							dialog.setMessage("There was an error saving your file.");
-}
+								File selectedFile = fc.getSelectedFile();
+								String absolutePath = selectedFile.getAbsolutePath();
+								if (pathStr == null || !pathStr.equals(absolutePath))
+									prefs.put("profile_path", absolutePath);
+
+								try (BufferedWriter out = new BufferedWriter(new FileWriter(selectedFile))) {
+									textPane.write(out);
+									out.flush();
+								} catch (IOException e) {
+									logger.catching(e);
+									dialog.setMessage("There was an error saving your file.");
+								}
+							}
+						} else
+							dialog.setMessage("The Profile was not read from the Unit.");
+						return null;
 					}
-				}else
-					dialog.setMessage("The Profile was not read from the Unit.");
+				}.execute();
 			}
 		});
 		popupMenu.add(mntmSaveProfileTo);
@@ -434,49 +462,62 @@ public class ConnectionPanel extends JPanel implements Observer {
 		mntmUploadProgramFrom = new JMenuItem("Upload Program From File...");
 		mntmUploadProgramFrom.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent actionEvent) {
-				if (isConnected()) {
-					if (textPane.getText().isEmpty())
-						dialog.setMessage("First Have to Read Profile.");
-					else {
+				new SwingWorker<Void, Void>() {
 
-						JFileChooser fc = new JFileChooser();
-						fc.setDialogTitle("Open Program");
-						fc.setMultiSelectionEnabled(false);
-						String pathStr = prefs.get("programPath", null);
+					@Override
+					protected Void doInBackground() throws Exception {
+						if (isConnected()) {
+							if (textPane.getText().isEmpty())
+								dialog.setMessage("First Have to Read Profile.");
+							else {
 
-						Path p = null;
-						if (pathStr != null) {
-							p = Paths.get(pathStr);
-							fc.setSelectedFile(p.toFile());
-						}
-						if (fc.showOpenDialog(ConnectionPanel.this) == JFileChooser.APPROVE_OPTION) {
-							File file = fc.getSelectedFile();
-							String absolutePath = file.getAbsolutePath();
-							if (p == null || !absolutePath.equals(pathStr)) {
-								prefs.put("programPath", absolutePath);
+								JFileChooser fc = new JFileChooser();
+								fc.setDialogTitle("Open Program");
+								fc.setMultiSelectionEnabled(false);
+								String pathStr = prefs.get("programPath", null);
+
+								Path p = null;
+								if (pathStr != null) {
+									p = Paths.get(pathStr);
+									fc.setSelectedFile(p.toFile());
+								}
+								if (fc.showOpenDialog(ConnectionPanel.this) == JFileChooser.APPROVE_OPTION) {
+									File file = fc.getSelectedFile();
+									String absolutePath = file.getAbsolutePath();
+									if (p == null || !absolutePath.equals(pathStr)) {
+										prefs.put("programPath", absolutePath);
+									}
+									writeProgram(file);
+								}
 							}
-							writeProgram(file);
 						}
+						return null;
 					}
-				}
+				}.execute();
 			}
 		});
 		
 		mntmCheckProgram = new JMenuItem("Check Program");
 		mntmCheckProgram.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent actionEvent) {
+				new SwingWorker<Void, Void>() {
 
-				if (isConnected()) {
-					String path = getProgramPath();
+					@Override
+					protected Void doInBackground() throws Exception {
+						if (isConnected()) {
+							String path = getProgramPath();
 
-					logger.trace("path={}", path);
+							logger.trace("path={}", path);
 
-					File file = new File(path);
-					if (file.exists()) {
-						compare(file);
-					} else
-						dialog.setMessage("The File do not exist.");
-				}
+							File file = new File(path);
+							if (file.exists()) {
+								compare(file);
+							} else
+								dialog.setMessage("The File do not exist.");
+						}
+						return null;
+					}
+				}.execute();
 			}
 		});
 		popupMenu.add(mntmCheckProgram);
@@ -485,56 +526,49 @@ public class ConnectionPanel extends JPanel implements Observer {
 		mntmCheckProgram_1 = new JMenuItem("Check Program with File...");
 		mntmCheckProgram_1.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				if (isConnected()) {
+				new SwingWorker<Void, Void>() {
 
-					JFileChooser fc = new JFileChooser();
-					fc.setDialogTitle("Open Program");
-					fc.setMultiSelectionEnabled(false);
-					String pathStr = prefs.get("programPath", null);
+					@Override
+					protected Void doInBackground() throws Exception {
+						if (isConnected()) {
 
-					Path p = null;
-					if(pathStr!=null){
-						p = Paths.get(pathStr);
-						fc.setSelectedFile(p.toFile());
-					}
-					if (fc.showOpenDialog(ConnectionPanel.this) == JFileChooser.APPROVE_OPTION) {
-						File file = fc.getSelectedFile();
-						String absolutePath = file.getAbsolutePath();
-						if(p==null || !absolutePath.equals(pathStr)) {
-							prefs.put("programPath", absolutePath);
+							JFileChooser fc = new JFileChooser();
+							fc.setDialogTitle("Open Program");
+							fc.setMultiSelectionEnabled(false);
+							String pathStr = prefs.get("programPath", null);
+
+							Path p = null;
+							if(pathStr!=null){
+								p = Paths.get(pathStr);
+								fc.setSelectedFile(p.toFile());
+							}
+							if (fc.showOpenDialog(ConnectionPanel.this) == JFileChooser.APPROVE_OPTION) {
+								File file = fc.getSelectedFile();
+								String absolutePath = file.getAbsolutePath();
+								if(p==null || !absolutePath.equals(pathStr)) {
+									prefs.put("programPath", absolutePath);
+								}
+								compare(file);
+							}
 						}
-						compare(file);
+						return null;
 					}
-				}
+				}.execute();
 			}
 		});
 		popupMenu.add(mntmCheckProgram_1);
 		
-		editProfile = new EditProfilePanel();
+		try {
+			editProfile = new EditProfilePanel();
+			editProfile.setUnitType((String) comboBoxUnitType.getSelectedItem());
+			databaseController.addObserver((Observer)editProfile);
+		} catch (Exception e1) {
+			logger.catching(e1);
+		}
 		tabbedPane.addTab("Edit Profile", null, editProfile, null);
 		setLayout(groupLayout);
 
 		MicrocontrollerSTM32.getInstance().addObserver(this);
-	}
-
-	private void setConnected(byte[] bytes) {
-		if(bytes!=null && bytes.length==1){
-			boolean isConnected = bytes[0]==Answer.ACK.getAnswer();
-			if(isConnected){
-				setLabel(lblConnection, "Connected", Color.GREEN);
-				btnConnect.setText(DISCONNECT);
-				btnRead.setEnabled(comboBoxUnitType.getSelectedIndex()>0);
-				dialog.setMessage((Status)null);
-			}else{
-				setLabel(lblConnection, CAN_NOT_CONNECT, Color.RED);
-				disconnect();
-				dialog.setMessage(Status.ERROR.setMessage("Cen Not Connect.("+(Answer.NACK.getAnswer()==bytes[0] ? Answer.NACK : (ToHex.bytesToHex(bytes)))+")"));
-			}
-		}else{
-			setLabel(lblConnection, CAN_NOT_CONNECT, Color.RED);
-			disconnect();
-			dialog.setMessage(Status.ERROR.setMessage("Con Not Connect.(NULL)"));
-		}
 	}
 
 	private void setLabel(JLabel label, String text, Color color) {
@@ -560,15 +594,22 @@ public class ConnectionPanel extends JPanel implements Observer {
 	}
 
 	private void disconnect() {
-		if(FlashConnector.isConnected()){
-			try {
-				FlashConnector.disconnect();
-			} catch (Exception e) {
-				logger.catching(e);
+		new SwingWorker<Void, Void>() {
+
+			@Override
+			protected Void doInBackground() throws Exception {
+				if(FlashConnector.isConnected()){
+					try {
+						FlashConnector.disconnect();
+					} catch (Exception e) {
+						logger.catching(e);
+					}
+				}
+				btnConnect.setText(CONNECT);
+				btnRead.setEnabled(false);
+				return null;
 			}
-		}
-		btnConnect.setText(CONNECT);
-		btnRead.setEnabled(false);
+		}.execute();
 	}
 
 	private static void addPopup(Component component, final JPopupMenu popup) {
@@ -591,75 +632,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 	@Override
 	public void update(Observable o, Object obj) {
-		logger.entry(o, obj);
-
-		try{
-
-		if (obj == null) {
-			if (o instanceof MicrocontrollerSTM32) {
-				MicrocontrollerSTM32 stm32 = (MicrocontrollerSTM32) o;
-				switch (stm32.getCommand()) {
-				case CONNECT:
-					logger.trace("CONNECT");
-					setConnected(stm32.getReadBytes());
-					break;
-				case ERASE:
-					logger.trace("ERASE");
-					dialog.setMessage(new Status[]{Status.ERASE.setMessage("Erased"), Status.BUTTON.setMessage("Ok")});
-					break;
-				case EXTENDED_ERASE:
-					logger.trace("EXTENDED_ERASE");
-					break;
-				case GET:
-					logger.trace("GET");
-					break;
-				case READ_MEMORY:
-					logger.trace("READ_MEMORY");
-					readMemory(stm32.getReadBytes());
-					break;
-				case WRITE_MEMORY:
-					logger.trace("WRITE_MEMORY");
-					break;
-				case USER_COMMAND:
-					logger.trace("USER_COMMAND");
-				}
-			}
-		} else{
-			logger.trace("dialog.setMessage({})", obj);
-			dialog.setMessage(obj);
-		}
-
-		}catch(Exception e){
-			logger.catching(e);
-		}
-		logger.exit();
-	}
-
-	private void readMemory(byte[] readBytes) {
-		if (buffer!=null) { //buffer contains data to compare
-
-			boolean equals = readBytes!=null && Arrays.equals(buffer, Arrays.copyOf(readBytes, buffer.length));
-
-			logger.trace("Setted '{}'", equals ? "Equal" : "Not Equal");
-			dialog.setMessage(equals ? "Equal" : "Not Equal");
-			buffer = null;
-		} else {
-			if (readBytes != null) {
-				setTextPaneText(readBytes);
-				databaseController.setProfile(textPane.getText());
-			} else {
-				setLabel(lblConnection, "Can Not read Memory", Color.RED);
-			}
-		}
-	}
-
-	private void setTextPaneText(byte[] readBytes) {
-		String string = new String(readBytes);
-		int indexOf = string.indexOf('\0');
-		if (indexOf > 0)
-			string = string.substring(0, indexOf);
-		textPane.setText(string);
-		dialog.setMessage(null);
+		new UpdateWorker(o, obj).execute();
 	}
 
 	private void writeProgram(File file) {
@@ -708,6 +681,153 @@ public class ConnectionPanel extends JPanel implements Observer {
 				MicrocontrollerSTM32.read(Address.PROGRAM);
 		}catch (IOException | InterruptedException e) {
 			logger.catching(e);
+		}
+	}
+
+	private class ConnectionWorker extends SwingWorker<Void, Void>{
+
+		@Override
+		protected Void doInBackground() throws Exception {
+			String text = btnConnect.getText();
+			logger.entry(text);
+			try {
+				switch(text){
+				case CONNECT:
+					logger.trace(CONNECT);
+					btnConnect.setText("Cancel");
+					FlashConnector.connect();
+					textPane.setText("");
+					break;
+				case DISCONNECT:
+					logger.trace("disconnect");
+					disconnect();
+					setLabel(lblConnection, PRESS_CONNECT_BUTTON, Color.YELLOW);
+					break;
+				default:
+					logger.trace("default");
+				}
+			} catch (Exception e) {
+				logger.catching(e);
+				JOptionPane.showMessageDialog(ConnectionPanel.this, e.getLocalizedMessage());
+				disconnect();
+				setLabel(lblConnection, PRESS_CONNECT_BUTTON, Color.YELLOW);
+			}
+			logger.exit();
+			return null;
+		}
+	}
+
+	private class ReaderWorker extends SwingWorker<Void, Void>{
+
+		@Override
+		protected Void doInBackground() throws Exception {
+			try {
+				MicrocontrollerSTM32.read((String) comboBoxUnitType.getSelectedItem());
+			} catch (InterruptedException e) {
+				logger.catching(e);
+			}
+			return null;
+		}
+	}
+
+	private class UpdateWorker extends SwingWorker<Observable, Object>{
+
+		private Observable observable;
+		private Object object;
+		public UpdateWorker(Observable observable, Object object){
+			this.observable = observable;
+			this.object = object;
+		}
+		@Override
+		protected Observable doInBackground() throws Exception {
+			try{
+
+			if (object == null) {
+				if (observable instanceof MicrocontrollerSTM32) {
+					MicrocontrollerSTM32 stm32 = (MicrocontrollerSTM32) observable;
+					switch (stm32.getCommand()) {
+					case CONNECT:
+						logger.trace("CONNECT");
+						setConnected(stm32.getReadBytes());
+						break;
+					case ERASE:
+						logger.trace("ERASE");
+						dialog.setMessage(new Status[]{Status.ERASE.setMessage("Erased"), Status.BUTTON.setMessage("Ok")});
+						break;
+					case EXTENDED_ERASE:
+						logger.trace("EXTENDED_ERASE");
+						break;
+					case GET:
+						logger.trace("GET");
+						break;
+					case READ_MEMORY:
+						logger.trace("READ_MEMORY");
+						readMemory(stm32.getReadBytes());
+						break;
+					case WRITE_MEMORY:
+						logger.trace("WRITE_MEMORY");
+						break;
+					case USER_COMMAND:
+						logger.trace("USER_COMMAND");
+					}
+				}
+			} else{
+				logger.trace("dialog.setMessage({})", object);
+				dialog.setMessage(object);
+			}
+
+			}catch(Exception e){
+				logger.catching(e);
+			}
+			logger.exit();
+			return null;
+		}
+
+		private void setConnected(byte[] bytes) {
+			if(bytes!=null && bytes.length==1){
+				boolean isConnected = bytes[0]==Answer.ACK.getAnswer();
+				if(isConnected){
+					setLabel(lblConnection, "Connected", Color.GREEN);
+					btnConnect.setText(DISCONNECT);
+					btnRead.setEnabled(comboBoxUnitType.getSelectedIndex()>0);
+					dialog.setMessage((Status)null);
+				}else{
+					setLabel(lblConnection, CAN_NOT_CONNECT, Color.RED);
+					disconnect();
+					dialog.setMessage(Status.ERROR.setMessage("Cen Not Connect.("+(Answer.NACK.getAnswer()==bytes[0] ? Answer.NACK : (ToHex.bytesToHex(bytes)))+")"));
+				}
+			}else{
+				setLabel(lblConnection, CAN_NOT_CONNECT, Color.RED);
+				disconnect();
+				dialog.setMessage(Status.ERROR.setMessage("Con Not Connect.(NULL)"));
+			}
+		}
+
+		private void readMemory(byte[] readBytes) throws IOException {
+			if (buffer!=null) { //buffer contains data to compare
+
+				boolean equals = readBytes!=null && Arrays.equals(buffer, Arrays.copyOf(readBytes, buffer.length));
+
+				logger.trace("Setted '{}'", equals ? "Equal" : "Not Equal");
+				dialog.setMessage(equals ? "Equal" : "Not Equal");
+				buffer = null;
+			} else {
+				if (readBytes != null) {
+					setTextPaneText(readBytes);
+					databaseController.setProfile(textPane.getText());
+				} else {
+					setLabel(lblConnection, "Can Not read Memory", Color.RED);
+				}
+			}
+		}
+
+		private void setTextPaneText(byte[] readBytes) {
+			String string = new String(readBytes);
+			int indexOf = string.indexOf('\0');
+			if (indexOf > 0)
+				string = string.substring(0, indexOf);
+			textPane.setText(string);
+			dialog.setMessage(null);
 		}
 	}
 }

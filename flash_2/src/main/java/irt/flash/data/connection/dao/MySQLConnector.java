@@ -17,7 +17,7 @@ public class MySQLConnector{
 	private static Class<?> classForName;
 
 	public static Connection getConnection() throws ClassNotFoundException, IOException, SQLException{
-		logger.info("Connecting to the Databace");
+		logger.trace("Connecting to the Databace");
 		if(classForName==null){
 			sqlProperties = new Properties();
 			sqlProperties.load(MySQLConnector.class.getResourceAsStream("MySQLConnector.properties"));

@@ -17,22 +17,39 @@
 	</Appenders>
 
 	<Loggers>
-	<logger name="irt.flash.data.connection.FlashSerialPort" level="INFO" />
-	<logger name="irt.flash.presentation.panel.ConnectionPanel" level="INFO" />
-	<logger name="irt.flash.presentation.panel.EditProfilePanel" level="INFO" />
+	<logger name="irt.flash.presentation.dialog.MessageDialog" level="INFO" />
+	<logger name="irt.flash.presentation.dialog.MessageDialog$DialogWorker" level="INFO" />
+
+	<logger name="irt.flash.presentation.panel.ConnectionPanel" level="all" />
+	<logger name="irt.flash.presentation.panel.EditProfilePanel" level="info" />
+
+	<logger name="irt.flash.presentation.panel.edit_profile.EditPanel" level="INFO" />
+	<logger name="irt.flash.presentation.panel.edit_profile.EditComboBoxPanel" level="INFO" />
+	<logger name="irt.flash.presentation.panel.edit_profile.EditTextFieldPanel" level="INFO" />
 	<logger name="irt.flash.presentation.panel.edit_profile.ProductDescriptionPanel" level="INFO" />
 	<logger name="irt.flash.presentation.panel.edit_profile.SystemNamePanel" level="INFO" />
-	<logger name="irt.flash.data.connection.FlashConnector" level="INFO" />
-	<logger name="irt.flash.data.connection.MicrocontrollerSTM32" level="INFO" />
-	<logger name="irt.flash.presentation.dialog.MessageDialog" level="all" />
-	<logger name="irt.flash.presentation.dialog.MessageDialog$DialogWorker" level="all" />
+	<logger name="irt.flash.presentation.panel.edit_profile.MacAddressPanel" level="INFO" />
+	<logger name="irt.flash.presentation.panel.edit_profile.DevicePartNumberPanel" level="INFO" />
+	<logger name="irt.flash.presentation.panel.edit_profile.DeviceTypePanel" level="INFO" />
+	<logger name="irt.flash.presentation.panel.edit_profile.DeviceSubtypePanel" level="INFO" />
+
+	<logger name="irt.flash.presentation.panel.edit_profile.extendable.ScrollablePanel" level="info" />
+
+	<logger name="irt.flash.presentation.panel.edit_profile.table.AbstractTableModel" level="INFO" />
+
+	<logger name="irt.flash.data.Table" level="INFO" />
 	<logger name="irt.flash.data.Profile" level="INFO" />
+	<logger name="irt.flash.data.Informer" level="INFO" />
+
+	<logger name="irt.flash.data.connection.FlashConnector" level="INFO" />
+	<logger name="irt.flash.data.connection.FlashSerialPort" level="INFO" />
+	<logger name="irt.flash.data.connection.MicrocontrollerSTM32" level="INFO" />
+
 	<logger name="irt.flash.data.connection.dao.Database" level="INFO" />
-	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberProfile" level="error" />
+	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberProfile" level="INFO" />
 	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumbers" level="error" />
 	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberTable" level="error" />
 	<logger name="irt.flash.data.connection.dao.DatabaseController" level="error" />
-	<logger name="irt.flash.data.Profile" level="INFO" />
 
 		<Root level="INFO">
 			<AppenderRef ref="STDOUT" />

@@ -56,12 +56,15 @@ import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import jssc.SerialPortException;
 import jssc.SerialPortList;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 
 public class ConnectionPanel extends JPanel implements Observer {
+	private static final String FCM_UPGRADE = "FCM upgrade";
+
 	private static final long serialVersionUID = -79571598522363841L;
 
 	private final Logger logger = (Logger) LogManager.getLogger();
@@ -106,6 +109,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 	private volatile static DatabaseController databaseController = new DatabaseController();
 
 	public ConnectionPanel(Window owner) {
+		logger.entry();
 		dialog = MessageDialog.getInstance(owner);
 		dialog.addButtonActionListener(new ActionListener() {
 			
@@ -171,7 +175,20 @@ public class ConnectionPanel extends JPanel implements Observer {
 		btnRead = new JButton("Read");
 		btnRead.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-				new ReaderWorker().execute();
+				if(btnRead.getText().equals(FCM_UPGRADE)){
+					comboBoxUnitType.setSelectedItem(Address.CONVERTER.toString());
+					try {
+						FlashConnector.write( (String) comboBoxComPort.getSelectedItem(),
+								new byte[]{0x7E, (byte) 0xFE, 0x00, 0x00, 0x00, 0x03, 0x00, 0x78, 0x64, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x5A, 0x51, 0x7E}
+						);
+					} catch (SerialPortException e) {
+						logger.catching(e);
+						JOptionPane.showMessageDialog(null, e.getLocalizedMessage());
+					}
+				}else{
+					editProfile.resetProfileVariables();
+					new ReaderWorker().execute();
+				}
 			}
 		});
 		btnRead.setMargin(new Insets(0, 0, 0, 0));
@@ -569,6 +586,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		setLayout(groupLayout);
 
 		MicrocontrollerSTM32.getInstance().addObserver(this);
+		logger.exit();
 	}
 
 	private void setLabel(JLabel label, String text, Color color) {
@@ -579,18 +597,16 @@ public class ConnectionPanel extends JPanel implements Observer {
 	private void setButtons() {
 		boolean selected = comboBoxComPort.getSelectedIndex()!=0;
 		btnConnect.setEnabled(selected);
+
+		logger.trace("CON Port is Selected = {}", selected);
+
 		if(selected){
-			if(FlashConnector.isConnected()){
+			if(FlashConnector.isConnected())
 				setLabel(lblConnection, "Connected", Color.GREEN);
-				btnRead.setEnabled(comboBoxUnitType.getSelectedIndex()>0);
-			}else{
+			else
 				setLabel(lblConnection, PRESS_CONNECT_BUTTON, Color.YELLOW);
-				btnRead.setEnabled(false);
-			}
-		}else{
-			setLabel(lblConnection, "Select The Serial Port", Color.YELLOW);
-			btnRead.setEnabled(false);
 		}
+		setReadButton();
 	}
 
 	private void disconnect() {
@@ -606,7 +622,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 					}
 				}
 				btnConnect.setText(CONNECT);
-				btnRead.setEnabled(false);
+				setReadButton();
 				return null;
 			}
 		}.execute();
@@ -789,7 +805,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 				if(isConnected){
 					setLabel(lblConnection, "Connected", Color.GREEN);
 					btnConnect.setText(DISCONNECT);
-					btnRead.setEnabled(comboBoxUnitType.getSelectedIndex()>0);
+					setReadButton();
 					dialog.setMessage((Status)null);
 				}else{
 					setLabel(lblConnection, CAN_NOT_CONNECT, Color.RED);
@@ -829,5 +845,19 @@ public class ConnectionPanel extends JPanel implements Observer {
 			textPane.setText(string);
 			dialog.setMessage(null);
 		}
+	}
+
+	private void setReadButton() {
+		boolean connected = FlashConnector.isConnected();
+		if(comboBoxUnitType.getSelectedItem().equals(Address.BIAS.toString()) && !connected)
+			setEnableReadButton(FCM_UPGRADE, FCM_UPGRADE, true);
+		else
+			setEnableReadButton("Read", "Read Profile", comboBoxUnitType.getSelectedIndex()>0 && connected);
+	}
+
+	private void setEnableReadButton(String text, String toolTipText, boolean enable) {
+		btnRead.setText(text);
+		btnRead.setToolTipText(toolTipText);
+		btnRead.setEnabled(enable);
 	}
 }

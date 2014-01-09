@@ -14,7 +14,7 @@ public class FrequencySetPanelTest {
 
 	@Test
 	public void testSetFrequencySet() {
-		frequencySetPanel.setFrequencySet("11GHz 23456000 6MHz");
+		frequencySetPanel.setValue("11GHz 23456000 6MHz");
 	}
 
 }

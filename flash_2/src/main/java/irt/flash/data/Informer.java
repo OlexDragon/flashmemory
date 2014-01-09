@@ -2,7 +2,13 @@ package irt.flash.data;
 
 import java.util.Observable;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.Logger;
+
 	public class Informer extends Observable{
+
+		protected final Logger logger = (Logger) LogManager.getLogger(getClass().getName());
+
 		private final String name;
 		private Object value;
 
@@ -15,6 +21,7 @@ import java.util.Observable;
 		}
 
 		public void setValue(Object value){
+			logger.trace("name={}, value={}", name, value);
 			if(this.value!=value){
 				this.value = value;
 				setChanged();

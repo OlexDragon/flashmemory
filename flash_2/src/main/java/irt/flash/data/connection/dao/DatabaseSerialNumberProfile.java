@@ -292,20 +292,23 @@ public class DatabaseSerialNumberProfile {
 	public List<String> getValues(int deviceType, int deviceSubtype, int profileVariableId) throws ClassNotFoundException, SQLException, IOException {
 		List<String> values = null;
 
-		String sql = sqlProperties.getProperty("select_variables_for_device_type");
-		logger.entry(profileVariableId, deviceType, deviceSubtype, sql);
+		if (deviceType != 0 && deviceSubtype != 0 && profileVariableId != 0) {
 
-		try(Connection connection = MySQLConnector.getConnection()){
-			try(PreparedStatement statement = connection.prepareStatement(sql)){
-				statement.setInt(1, deviceType);
-				statement.setInt(2, deviceSubtype);
-				statement.setInt(3, profileVariableId);
-				try(ResultSet resultSet = statement.executeQuery()){
-					if(resultSet.next()){
-						values = new ArrayList<>();
-						do{
-							values.add(resultSet.getString("value"));
-						}while(resultSet.next());
+			String sql = sqlProperties.getProperty("select_variables_for_device_type");
+			logger.entry(deviceType, deviceSubtype, profileVariableId, sql);
+
+			try (Connection connection = MySQLConnector.getConnection()) {
+				try (PreparedStatement statement = connection.prepareStatement(sql)) {
+					statement.setInt(1, deviceType);
+					statement.setInt(2, deviceSubtype);
+					statement.setInt(3, profileVariableId);
+					try (ResultSet resultSet = statement.executeQuery()) {
+						if (resultSet.next()) {
+							values = new ArrayList<>();
+							do {
+								values.add(resultSet.getString("value"));
+							} while (resultSet.next());
+						}
 					}
 				}
 			}

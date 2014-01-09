@@ -1,6 +1,7 @@
 package irt.flash.presentation.panel.edit_profile;
 import irt.flash.data.connection.MicrocontrollerSTM32.ProfileProperties;
 import irt.flash.data.value.ValueFrequency;
+import irt.flash.presentation.panel.edit_profile.extendable.EditPanel;
 
 import java.awt.Font;
 import java.io.IOException;
@@ -13,13 +14,8 @@ import javax.swing.JList;
 import javax.swing.JTextField;
 import javax.swing.border.BevelBorder;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
-
-public class FrequencySetPanel extends EditPanel {
+public class FrequencySetPanel extends EditPanel<String> {
 	private static final long serialVersionUID = -713461044198711633L;
-
-	private static final Logger logger = (Logger) LogManager.getLogger();
 
 	private JList<Object> list;
 
@@ -45,10 +41,10 @@ public class FrequencySetPanel extends EditPanel {
 		setLayout(groupLayout);
 	}
 
-	public void setFrequencySet(String frequencies) {
+	public void setValue(Object frequencies) {
 		logger.trace(frequencies);
 		if(frequencies!=null){
-			String[] split = frequencies.split(" ");
+			String[] split = ((String)frequencies).split(" ");
 			ValueFrequency[] vFrequencies = new ValueFrequency[split.length];
 			for(int i=0; i<split.length; i++){
 				vFrequencies[i] = new ValueFrequency(split[i], "1MHz", "20GHz");
@@ -59,5 +55,10 @@ public class FrequencySetPanel extends EditPanel {
 					list.add(new JTextField(vf.toString()));
 		}else
 			list.removeAll();
+	}
+
+	@Override
+	public void reset() {
+		// TODO Auto-generated method stub
 	}
 }

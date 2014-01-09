@@ -33,8 +33,7 @@ public class FlashConnector implements Observer{
 
 		String serialPortStr = prefs.get(ConnectionPanel.SERIAL_PORT, ConnectionPanel.SELECT_SERIAL_PORT);
 		if(!serialPortStr.equals(ConnectionPanel.SELECT_SERIAL_PORT)){
-			if(serialPort!=null && serialPort.isOpened())
-				serialPort.closePort();
+			disconnect();
 			serialPort = new FlashSerialPort(serialPortStr);
 			if(serialPort.openPort()){
 				MicrocontrollerSTM32.getInstance(serialPort).addObserver(getConnector());
@@ -48,6 +47,7 @@ public class FlashConnector implements Observer{
 		if(serialPort!=null && serialPort.isOpened())
 			serialPort.closePort();
 		isConnected = false;
+		serialPort = null;
 	}
 
 	public static boolean isConnected() {
@@ -90,5 +90,13 @@ public class FlashConnector implements Observer{
 			isConnected = bytes[0]==Answer.ACK.getAnswer();
 		else
 			isConnected = false;
+	}
+
+	public static void write(String serialPortStr, byte[] bytes) throws SerialPortException {
+		serialPort = new FlashSerialPort(serialPortStr);
+		if(serialPort.openPort()){
+			serialPort.writeBytes(bytes);
+			disconnect();
+		}
 	}
 }

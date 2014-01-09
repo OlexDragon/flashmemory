@@ -18,4 +18,12 @@ public class ValueDescription {
 	public String toString() {
 		return value + " - " + description;
 	}
+	@Override
+	public int hashCode() {
+		return value==null || value.isEmpty() ? super.hashCode() : value.hashCode();
+	}
+	@Override
+	public boolean equals(Object obj) {
+		return obj!=null ? obj.hashCode()==hashCode() : false;
+	}
 }

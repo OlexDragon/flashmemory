@@ -56,19 +56,17 @@ import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
-import jssc.SerialPortException;
 import jssc.SerialPortList;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 
 public class ConnectionPanel extends JPanel implements Observer {
-	private static final String FCM_UPGRADE = "FCM upgrade";
-
 	private static final long serialVersionUID = -79571598522363841L;
 
 	private final Logger logger = (Logger) LogManager.getLogger();
 
+	private static final String FCM_UPGRADE = "FCM upgrade";
 	private static final String CAN_NOT_CONNECT = "Can Not Connect";
 	private static final String DISCONNECT = "Disconnect";
 	private static final String CONNECT = "Connect";
@@ -103,13 +101,13 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 	private MessageDialog dialog;
 
-	private EditProfilePanel editProfile;
+	private ProfileWorkerPanel editProfile;
 
 	private volatile static byte[] buffer;
 	private volatile static DatabaseController databaseController = new DatabaseController();
 
 	public ConnectionPanel(Window owner) {
-		logger.entry();
+		logger.info("* Start *");
 		dialog = MessageDialog.getInstance(owner);
 		dialog.addButtonActionListener(new ActionListener() {
 			
@@ -176,18 +174,29 @@ public class ConnectionPanel extends JPanel implements Observer {
 		btnRead.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				if(btnRead.getText().equals(FCM_UPGRADE)){
-					comboBoxUnitType.setSelectedItem(Address.CONVERTER.toString());
-					try {
-						FlashConnector.write( (String) comboBoxComPort.getSelectedItem(),
-								new byte[]{0x7E, (byte) 0xFE, 0x00, 0x00, 0x00, 0x03, 0x00, 0x78, 0x64, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x5A, 0x51, 0x7E}
-						);
-					} catch (SerialPortException e) {
-						logger.catching(e);
-						JOptionPane.showMessageDialog(null, e.getLocalizedMessage());
-					}
+					new SwingWorker<Void, Void>(){
+
+						@Override
+						protected Void doInBackground() throws Exception {
+							comboBoxUnitType.setSelectedItem(Address.CONVERTER.toString());
+							try {
+								FlashConnector.write( (String) comboBoxComPort.getSelectedItem(),
+										new byte[]{0x7E, (byte) 0xFE, 0x00, 0x00, 0x00, 0x03, 0x00, 0x78, 0x64, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x5A, 0x51, 0x7E}
+								);
+								synchronized (this) {
+									wait(1000);
+								}
+								new ConnectionWorker().execute();
+							} catch (Exception e) {
+								logger.catching(e);
+								JOptionPane.showMessageDialog(null, e.getLocalizedMessage());
+							}
+							return null;
+						}
+						
+					}.execute();
 				}else{
-					editProfile.resetProfileVariables();
-					new ReaderWorker().execute();
+					readProfile();
 				}
 			}
 		});
@@ -576,7 +585,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		popupMenu.add(mntmCheckProgram_1);
 		
 		try {
-			editProfile = new EditProfilePanel();
+			editProfile = new ProfileWorkerPanel();
 			editProfile.setUnitType((String) comboBoxUnitType.getSelectedItem());
 			databaseController.addObserver((Observer)editProfile);
 		} catch (Exception e1) {
@@ -586,7 +595,11 @@ public class ConnectionPanel extends JPanel implements Observer {
 		setLayout(groupLayout);
 
 		MicrocontrollerSTM32.getInstance().addObserver(this);
-		logger.exit();
+	}
+
+	private void readProfile() {
+		editProfile.resetProfileVariables();
+		new ReaderWorker().execute();
 	}
 
 	private void setLabel(JLabel label, String text, Color color) {
@@ -806,7 +819,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 					setLabel(lblConnection, "Connected", Color.GREEN);
 					btnConnect.setText(DISCONNECT);
 					setReadButton();
-					dialog.setMessage((Status)null);
+					readProfile();
 				}else{
 					setLabel(lblConnection, CAN_NOT_CONNECT, Color.RED);
 					disconnect();

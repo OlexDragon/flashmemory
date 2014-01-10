@@ -24,10 +24,11 @@ public class DatabaseDeviceTypes {
 	private Properties sqlProperties;
 
 	public DatabaseDeviceTypes(Properties sqlProperties){
+		logger.info("* Start *");
 		this.sqlProperties = sqlProperties;
 	}
 
-	public List<DeviceType> getTypes(String unitType) throws ClassNotFoundException, SQLException, IOException {
+	public List<DeviceType> getTypes(String unitType) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		List<DeviceType> deviceTypes = null;
 
 		String sql = sqlProperties.getProperty("select_device_types");
@@ -49,7 +50,7 @@ public class DatabaseDeviceTypes {
 		return logger.exit(deviceTypes);
 	}
 
-	public List<DeviceType> getSubtypes() throws SQLException, ClassNotFoundException, IOException {
+	public List<DeviceType> getSubtypes() throws SQLException, ClassNotFoundException, IOException, InterruptedException {
 		List<DeviceType> deviceTypes = null;
 
 		String sql = sqlProperties.getProperty("select_device_subtypes");
@@ -70,7 +71,7 @@ public class DatabaseDeviceTypes {
 		return logger.exit(deviceTypes);
 	}
 
-	public List<ValueDescription> getProfileVariablesPossibleValues(long profileVariableId) throws ClassNotFoundException, SQLException, IOException {
+	public List<ValueDescription> getProfileVariablesPossibleValues(long profileVariableId) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		List<ValueDescription> valueDescription = null;
 
 		String sql = sqlProperties.getProperty("select_profile_variables_possible_values");
@@ -92,7 +93,7 @@ public class DatabaseDeviceTypes {
 		return logger.exit(valueDescription);
 	}
 
-	public UnitType getUnitType(String unitTypeStr) throws SQLException, ClassNotFoundException, IOException {
+	public UnitType getUnitType(String unitTypeStr) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
 		UnitType unitType = null;
 
 		String sql = sqlProperties.getProperty("select_unit_type");
@@ -110,7 +111,7 @@ public class DatabaseDeviceTypes {
 		return logger.exit(unitType);
 	}
 
-	public ProfileVariable getProfileVariavle(String profileVariableStr) throws ClassNotFoundException, SQLException, IOException {
+	public ProfileVariable getProfileVariavle(String profileVariableStr) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		ProfileVariable profileVariable = null;
 
 		String sql = sqlProperties.getProperty("select_profile_variable");

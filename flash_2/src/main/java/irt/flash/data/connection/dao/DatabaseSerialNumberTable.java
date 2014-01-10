@@ -22,6 +22,7 @@ public class DatabaseSerialNumberTable {
 	private Properties sqlProperties;
 
 	public DatabaseSerialNumberTable(Properties sqlProperties) {
+		logger.info("* Start *");
 		this.sqlProperties = sqlProperties;
 	}
 

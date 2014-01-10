@@ -22,10 +22,11 @@ public class DatabaseSerialNumbers {
 	private Properties sqlProperties;
 
 	public DatabaseSerialNumbers(Properties sqlProperties){
+		logger.info("* Start *");
 		this.sqlProperties = sqlProperties;
 	}
 
-	public boolean isExists(String serialNumber) throws ClassNotFoundException, SQLException, IOException{
+	public boolean isExists(String serialNumber) throws ClassNotFoundException, SQLException, IOException, InterruptedException{
 
 		boolean hasNext = false;
 		String sql = sqlProperties.getProperty("select_serial_number");
@@ -94,7 +95,7 @@ public class DatabaseSerialNumbers {
 		return logger.exit(serialNumber);
 	}
 
-	public String getNextSerialNumber(String yerWeek) throws ClassNotFoundException, SQLException, IOException {
+	public String getNextSerialNumber(String yerWeek) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		logger.entry(yerWeek);
 
 		String serialNumber = null;

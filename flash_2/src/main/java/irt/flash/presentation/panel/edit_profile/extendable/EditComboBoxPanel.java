@@ -16,7 +16,7 @@ public abstract class EditComboBoxPanel<T> extends EditPanel<T> {
 
 	public EditComboBoxPanel(String title, ProfileProperties profileProperties) throws Exception {
 		super(title, profileProperties);
-		
+
 		comboBox = new JComboBox<>();
 		comboBox.setFont(new Font("Tahoma", Font.BOLD, 16));
 		setComboBoxModel();
@@ -38,16 +38,17 @@ public abstract class EditComboBoxPanel<T> extends EditPanel<T> {
 
 	@Override
 	public void setValue(final Object value) {
+		logger.debug(value);
 		new SwingWorker<Void, Void>() {
 
 			@SuppressWarnings("unchecked")
 			@Override
 			protected Void doInBackground() throws Exception {
-				logger.trace(value);
 				T v = (T) value;
 				oldValues.add(v);
 				comboBox.setSelectedItem(v);
 				setBackground(v);
+				logger.debug("value {} is set", v);
 				return null;
 			}
 		}.execute();

@@ -5,9 +5,12 @@ import irt.flash.data.connection.MicrocontrollerSTM32.ProfileProperties;
 import irt.flash.presentation.panel.edit_profile.table.TableModelInterface;
 
 import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -21,6 +24,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.SwingWorker;
 
 public abstract class EditTablePanel extends EditPanel<String> {
 	private static final long serialVersionUID = -5833224115643726296L;
@@ -31,8 +35,16 @@ public abstract class EditTablePanel extends EditPanel<String> {
 	public EditTablePanel(String title, ProfileProperties profileProperties) throws ClassNotFoundException, SQLException, IOException {
 		super(title, profileProperties);
 
-		
 		JScrollPane scrollPane = new JScrollPane();
+		scrollPane.addComponentListener(new ComponentAdapter() {
+			@Override
+			public void componentResized(ComponentEvent e) {
+				Dimension size = table.getSize();
+				table.setPreferredScrollableViewportSize(size);
+				revalidate();
+			}
+		});
+
 		GroupLayout groupLayout = new GroupLayout(this);
 		groupLayout.setHorizontalGroup(
 			groupLayout.createParallelGroup(Alignment.LEADING)
@@ -46,9 +58,10 @@ public abstract class EditTablePanel extends EditPanel<String> {
 		tableModel = getTableModel();
 
 		table = new JTable(tableModel);
+		table.setPreferredScrollableViewportSize(new Dimension(250, 20));
+
 		scrollPane.setViewportView(table);
 		table.setFont(new Font("Tahoma", Font.BOLD, 16));
-		
 		table.addKeyListener(new KeyAdapter() {
 			@Override
 			public void keyPressed(KeyEvent keyEvent) {
@@ -58,6 +71,9 @@ public abstract class EditTablePanel extends EditPanel<String> {
 				}
 			}
 		});
+//		Enumeration<TableColumn> columns = table.getColumnModel().getColumns();
+//		while(columns.hasMoreElements())
+//			columns.nextElement().setPreferredWidth(530);
 
 		JPopupMenu popupMenu = new JPopupMenu();
 		addPopup(table, popupMenu);
@@ -120,4 +136,17 @@ public abstract class EditTablePanel extends EditPanel<String> {
 	}
 
 	protected abstract TableModelInterface getTableModel();
+
+	@Override
+	public void reset() {
+		super.reset();
+		new SwingWorker<Void, Void>(){
+			@Override
+			protected Void doInBackground() throws Exception {
+				tableModel.setTable(null);
+				return null;
+			}
+
+		};
+	}
 }

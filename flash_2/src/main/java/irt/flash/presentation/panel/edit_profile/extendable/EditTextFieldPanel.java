@@ -82,4 +82,16 @@ public abstract class EditTextFieldPanel extends EditPanel<String> {
 			}
 		}.execute();
 	}
+
+	@Override
+	public void reset() {
+		super.reset();
+		new SwingWorker<Void, Void>() {
+			@Override
+			protected Void doInBackground() throws Exception {
+				textField.setText("");
+				return null;
+			}
+		};
+	}
 }

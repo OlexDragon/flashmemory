@@ -25,10 +25,11 @@ public class DatabaseSerialNumberProfile {
 	private Properties sqlProperties;
 
 	public DatabaseSerialNumberProfile(Properties sqlProperties){
+		logger.info("* Start *");
 		this.sqlProperties = sqlProperties;
 	}
 
-	public void set(long serialNumberId, String variableName, String value) throws ClassNotFoundException, SQLException, IOException {
+	public void set(long serialNumberId, String variableName, String value) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		if(serialNumberId>0 && variableName!=null && !variableName.isEmpty() && value!=null && !value.isEmpty()){
 			try(Connection connection = MySQLConnector.getConnection()){
 				long variableId = getProfileVariableId(connection, variableName);
@@ -95,7 +96,7 @@ public class DatabaseSerialNumberProfile {
 		logger.exit();
 	}
 
-	public void setActive(Connection connection, long serialNumberId, Set<Object> activeProfileVariables) throws SQLException, ClassNotFoundException, IOException {
+	public void setActive(Connection connection, long serialNumberId, Set<Object> activeProfileVariables) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
 		logger.entry(serialNumberId, activeProfileVariables);
 
 		//get not used variables
@@ -169,7 +170,7 @@ public class DatabaseSerialNumberProfile {
 		return variableId;
 	}
 
-	public long getProfileVariableId(Connection connection, String variableName) throws SQLException, ClassNotFoundException, IOException {
+	public long getProfileVariableId(Connection connection, String variableName) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
 		logger.entry(variableName);
 
 		if(variableName==null || variableName.isEmpty()){
@@ -206,7 +207,7 @@ public class DatabaseSerialNumberProfile {
 		return logger.exit(variableId);
 	}
 
-	public List<ProfileVariable> getAllProfileVariables() throws ClassNotFoundException, SQLException, IOException {
+	public List<ProfileVariable> getAllProfileVariables() throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 
 		String sql = sqlProperties.getProperty("profile_variables");
 		logger.trace(sql);
@@ -230,7 +231,7 @@ public class DatabaseSerialNumberProfile {
 		return profileVariables;
 	}
 
-	public String getNextMacAddress() throws ClassNotFoundException, SQLException, IOException {
+	public String getNextMacAddress() throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 
 		String sql = sqlProperties.getProperty("all_mac_addresses");
 		logger.entry(sql);
@@ -289,7 +290,7 @@ public class DatabaseSerialNumberProfile {
 	//AND
 	//`values`.`id_profile_variables` = 3
 	//ORDER BY `values`.`value`
-	public List<String> getValues(int deviceType, int deviceSubtype, int profileVariableId) throws ClassNotFoundException, SQLException, IOException {
+	public List<String> getValues(int deviceType, int deviceSubtype, int profileVariableId) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		List<String> values = null;
 
 		if (deviceType != 0 && deviceSubtype != 0 && profileVariableId != 0) {
@@ -316,7 +317,7 @@ public class DatabaseSerialNumberProfile {
 		return logger.exit(values);
 	}
 
-	public List<String> getValues(int profileVariableIdToGet, int valueProfileVariableId, String value) throws ClassNotFoundException, SQLException, IOException {
+	public List<String> getValues(int profileVariableIdToGet, int valueProfileVariableId, String value) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		List<String> values = null;
 
 		String sql = sqlProperties.getProperty("select_value_where_value");

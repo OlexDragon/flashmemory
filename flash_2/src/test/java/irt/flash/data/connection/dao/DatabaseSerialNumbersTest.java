@@ -59,7 +59,7 @@ public class DatabaseSerialNumbersTest {
 	}
 
 	@Test
-	public void getSerialNumbersStartWith() throws ClassNotFoundException, SQLException, IOException {
+	public void getSerialNumbersStartWith() throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		assertEquals("IRT-1343002", databaseSerialNumbers.getNextSerialNumber("1343"));
 		assertEquals("IRT-1351001", databaseSerialNumbers.getNextSerialNumber("1351"));
 	}

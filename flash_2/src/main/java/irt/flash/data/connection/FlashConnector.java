@@ -22,7 +22,9 @@ public class FlashConnector implements Observer{
 	private static FlashConnector connector = new FlashConnector();
 	private static boolean isConnected;
 
-	private FlashConnector(){ }
+	private FlashConnector(){
+		logger.info("* Start *");
+	}
 
 	public static FlashConnector getConnector(){
 		return connector;
@@ -93,7 +95,11 @@ public class FlashConnector implements Observer{
 	}
 
 	public static void write(String serialPortStr, byte[] bytes) throws SerialPortException {
+		if(serialPort!=null && serialPort.isOpened())
+			disconnect();
+
 		serialPort = new FlashSerialPort(serialPortStr);
+
 		if(serialPort.openPort()){
 			serialPort.writeBytes(bytes);
 			disconnect();

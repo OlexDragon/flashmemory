@@ -44,18 +44,19 @@ public class EditProfilePanel extends JScrollPane implements Observer {
 	private DeviceTypePanel deviceTypePanel;
 
 	public EditProfilePanel() throws Exception {
+		logger.info("* Start *");
 
 		deviceTypePanel = new DeviceTypePanel();
 		ProductDescriptionPanel productDescriptionPanel = new ProductDescriptionPanel();
 		DevicePartNumberPanel devicePartNumberPanel = new DevicePartNumberPanel();
 		DeviceSubtypePanel deviceSubtypePanel = new DeviceSubtypePanel();
 
-		productDescriptionPanel.addObserver(devicePartNumberPanel);
-		devicePartNumberPanel.addObserver(productDescriptionPanel);
 		deviceTypePanel.addObserver(productDescriptionPanel);
-		deviceTypePanel.addObserver(devicePartNumberPanel);
 		deviceSubtypePanel.addObserver(productDescriptionPanel);
+		devicePartNumberPanel.addObserver(productDescriptionPanel);
 		deviceSubtypePanel.addObserver(devicePartNumberPanel);
+		deviceTypePanel.addObserver(devicePartNumberPanel);
+		productDescriptionPanel.addObserver(devicePartNumberPanel);
 
 		JPanel panel = new ScrollablePanel();
 		setViewportView(panel);
@@ -149,7 +150,7 @@ public class EditProfilePanel extends JScrollPane implements Observer {
 				for (EditPanel<?> ep : panels) {
 					String property = ep.getProfileProperties().toString();
 					String value = p.getProperty(property);
-					logger.trace("property={}, value={}", property, value);
+					logger.debug("property={}, value={}", property, value);
 					((EditPanel<String>) ep).setValue(value);
 				}
 

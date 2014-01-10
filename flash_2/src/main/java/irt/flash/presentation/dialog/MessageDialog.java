@@ -59,6 +59,9 @@ public class MessageDialog extends JDialog{
 
 	private MessageDialog(Window owner) {
 		super(owner, Dialog.DEFAULT_MODALITY_TYPE);
+
+		logger.info("* Start *");
+
 		setResizable(false);
 		setUndecorated(true);
 		getContentPane().setLayout(new BorderLayout(4, 4));

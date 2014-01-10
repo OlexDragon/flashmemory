@@ -26,6 +26,7 @@ public class DatabaseController extends Thread {
 	private static Map<String, ProfileVariable> profileVariableMap;
 
 	public DatabaseController() {
+		logger.info("* Start *");
 		setDaemon(true);
 		int priority = getPriority();
 		if(priority>Thread.MIN_PRIORITY)
@@ -75,7 +76,7 @@ public class DatabaseController extends Thread {
 		return profileVariables!=null ? Collections.unmodifiableList(profileVariables) : null;
 	}
 
-	public static Database setProfileVariables() throws IOException, ClassNotFoundException, SQLException {
+	public static Database setProfileVariables() throws IOException, ClassNotFoundException, SQLException, InterruptedException {
 		Database database = Database.getInstance();
 		profileVariables = database.getAllProfileVariables();
 		return database;

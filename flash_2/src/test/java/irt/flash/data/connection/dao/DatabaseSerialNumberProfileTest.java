@@ -21,7 +21,7 @@ public class DatabaseSerialNumberProfileTest {
 	}
 
 	@Test
-	public void testGetNextMacAddress() throws ClassNotFoundException, SQLException, IOException {
+	public void testGetNextMacAddress() throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		String nextMacAddress = databaseSerialNumberProfile.getNextMacAddress();
 		assertNotNull(nextMacAddress);
 	}

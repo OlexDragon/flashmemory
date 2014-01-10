@@ -25,15 +25,33 @@ public class ProductDescriptionPanel extends EditComboBoxPanel<String> implement
 
 	private int deviceType;
 	private int deviceSubtype;
-	private ItemListener itemListener;
+	private ItemListener itemListener = new ItemListener() {
+		public void itemStateChanged(ItemEvent itemEvent) {
+			if(itemEvent.getStateChange()==ItemEvent.SELECTED)
+				new SwingWorker<Void, Void>() {
+
+					@Override
+					protected Void doInBackground() throws Exception {
+						String selectedItem = (String) comboBox.getSelectedItem();
+						informer.setValue(selectedItem);
+						oldValues.add(selectedItem);
+						setBackground(selectedItem);
+						logger.debug("itemStateChanged = {}", selectedItem);
+						return null;
+					}
+				}.execute();
+		}
+	};
 
 	public ProductDescriptionPanel() throws Exception {
 		super("Product Description", ProfileProperties.PRODUCT_DESCRIPTION);
+		comboBox.addItemListener(itemListener);
+		comboBox.setEditable(true);
 	}
 
 	@Override
 	public void update(Observable informer, Object o) {
-		logger.trace("{}, {}", informer, o);
+		logger.debug("{}, {}", informer, o);
 
 		if(informer instanceof Informer)
 			new UpdateWorker((Informer)informer).execute();
@@ -45,31 +63,6 @@ public class ProductDescriptionPanel extends EditComboBoxPanel<String> implement
 
 	@Override
 	protected void setComboBoxModel() throws Exception {
-		new SwingWorker<Void, Void>() {
-
-			@Override
-			protected Void doInBackground() throws Exception {
-				itemListener = new ItemListener() {
-					public void itemStateChanged(ItemEvent itemEvent) {
-						if(itemEvent.getStateChange()==ItemEvent.SELECTED)
-							new SwingWorker<Void, Void>() {
-
-								@Override
-								protected Void doInBackground() throws Exception {
-									String selectedItem = (String) comboBox.getSelectedItem();
-									informer.setValue(selectedItem);
-									oldValues.add(selectedItem);
-									setBackground(selectedItem);
-									return null;
-								}
-							}.execute();
-					}
-				};
-				comboBox.addItemListener(itemListener);
-				comboBox.setEditable(true);
-				return null;
-			}
-		}.execute();
 	}
 
 	//****************************************************************************************
@@ -83,7 +76,6 @@ public class ProductDescriptionPanel extends EditComboBoxPanel<String> implement
 
 		@Override
 		protected Informer doInBackground() throws Exception {
-			logger.trace(informer);
 			try {
 				switch(informer.getName()){
 				case "type":
@@ -105,6 +97,7 @@ public class ProductDescriptionPanel extends EditComboBoxPanel<String> implement
 
 		private boolean getDeviceType() {
 			int dt = getDeviceTypeInt();
+			logger.entry(dt);
 
 			boolean changed;
 			if(deviceType!=dt){
@@ -113,11 +106,12 @@ public class ProductDescriptionPanel extends EditComboBoxPanel<String> implement
 			}else
 				changed = false;
 
-			return changed;
+			return logger.exit(changed);
 		}
 
 		private boolean getDeviceSubtype() {
 			int dt = getDeviceTypeInt();
+			logger.entry(dt);
 
 			boolean changed;
 			if(deviceSubtype!=dt){
@@ -126,7 +120,7 @@ public class ProductDescriptionPanel extends EditComboBoxPanel<String> implement
 			}else
 				changed = false;
 
-			return changed;
+			return logger.exit(changed);
 		}
 
 		private int getDeviceTypeInt() {
@@ -135,28 +129,41 @@ public class ProductDescriptionPanel extends EditComboBoxPanel<String> implement
 			return dt;
 		}
 
-		private void setComboBoxModel() throws IOException, ClassNotFoundException, SQLException {
-			List<String> productDescription = Database.getProductDescriptions(deviceType, deviceSubtype);
-			DefaultComboBoxModel<String> model = productDescription!=null ?
-												new DefaultComboBoxModel<>(productDescription.toArray(new String[productDescription.size()])) :
-												new DefaultComboBoxModel<String>();
+		private void setComboBoxModel() throws IOException, ClassNotFoundException, SQLException, InterruptedException {
+			if (deviceType != 0 && deviceSubtype != 0){
+				logger.entry(deviceType, deviceSubtype);
 
-			DefaultComboBoxModel<String> m = (DefaultComboBoxModel<String>) comboBox.getModel();
-			if(!m.equals(model))
-				comboBox.setModel(model);
+				new SwingWorker<Void, Void>() {
+
+					@Override
+					protected Void doInBackground() throws Exception {
+						List<String> productDescription = Database.getProductDescriptions(deviceType, deviceSubtype);
+						logger.trace(productDescription);
+
+						DefaultComboBoxModel<String> model = productDescription!=null ?
+															new DefaultComboBoxModel<>(productDescription.toArray(new String[productDescription.size()])) :
+															new DefaultComboBoxModel<String>();
+
+						if(!comboBox.getModel().equals(model))
+							comboBox.setModel(model);
+						logger.exit("setComboBoxModel();");
+						return null;
+					}
+					
+				};
+			}
 		}
 
-		private void setComboBoxSelectedItem(String partNumber) throws ClassNotFoundException, IOException, SQLException {
-			logger.entry(partNumber);
+		private void setComboBoxSelectedItem(String partNumber) throws ClassNotFoundException, IOException, SQLException, InterruptedException {
 			List<String> productPartNumbers = Database.getDescriptions(partNumber);
-			if(productPartNumbers!=null && !productPartNumbers.contains(comboBox.getSelectedItem())){
-				comboBox.removeItemListener(itemListener);
-				String anObject = productPartNumbers.get(0);
-				comboBox.setSelectedItem(anObject);
-				oldValues.add(anObject);
-				setBackground(anObject);
-				comboBox.addItemListener(itemListener);
-			}
+			logger.entry(partNumber, productPartNumbers);
+			Object selectedItem = comboBox.getSelectedItem();
+			if (productPartNumbers != null && !productPartNumbers.contains(selectedItem)) {
+					comboBox.removeItemListener(itemListener);
+					setValue(selectedItem = productPartNumbers.get(0));
+					comboBox.addItemListener(itemListener);
+				}
+			logger.exit(selectedItem);
 		}
 	}
 }

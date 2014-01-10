@@ -41,6 +41,7 @@ public class Database extends Observable {
 	}
 
 	private Database() throws IOException{
+		logger.info("* Start *");
 		defaultProperties.load(getClass().getResourceAsStream("default.properties"));
 		sqlProperties.load(getClass().getResourceAsStream("sql.properties"));
 		databaseSerialNumber = new DatabaseSerialNumbers(sqlProperties);
@@ -49,7 +50,7 @@ public class Database extends Observable {
 		databaseDeviceTypes = new DatabaseDeviceTypes(sqlProperties);
 	}
 
-	public long setProfile(String profileStr) throws ClassNotFoundException, SQLException, IOException{
+	public long setProfile(String profileStr) throws ClassNotFoundException, SQLException, IOException, InterruptedException{
 		logger.entry(profileStr);
 		long serialNumberId = 0;
 
@@ -79,7 +80,7 @@ public class Database extends Observable {
 		super.notifyObservers(profile);
 	}
 
-	public Long updateProfile(String oldProfileStr, String newProfileStr) throws SQLException, ClassNotFoundException, IOException {
+	public Long updateProfile(String oldProfileStr, String newProfileStr) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
 		logger.entry(oldProfileStr, newProfileStr);
 		long serialNumberId = 0;
 
@@ -124,7 +125,7 @@ public class Database extends Observable {
 		logger.exit();
 	}
 
-	private void setTable(Connection connection, long serialNumberId, Table table) throws SQLException, ClassNotFoundException, IOException {
+	private void setTable(Connection connection, long serialNumberId, Table table) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
 		logger.entry(serialNumberId, table);
 
 		long profileVariableId = databaseSerialNumberProfile.getProfileVariableId(connection, table.getName());
@@ -142,7 +143,7 @@ public class Database extends Observable {
 		logger.exit();
 	}
 
-	private void setProfile(Connection connection, long serialNumberId, Profile profile) throws SQLException, ClassNotFoundException, IOException {
+	private void setProfile(Connection connection, long serialNumberId, Profile profile) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
 		Properties properties = profile.getProperties();
 		Set<Object> keySet = properties.keySet();
 
@@ -172,15 +173,15 @@ public class Database extends Observable {
 		return serialNumberId;
 	}
 
-	public List<ProfileVariable> getAllProfileVariables() throws ClassNotFoundException, SQLException, IOException {
+	public List<ProfileVariable> getAllProfileVariables() throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return databaseSerialNumberProfile.getAllProfileVariables();
 	}
 
-	public String getNextSerialNumber(String yerWeek) throws ClassNotFoundException, SQLException, IOException {
+	public String getNextSerialNumber(String yerWeek) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return databaseSerialNumber.getNextSerialNumber(yerWeek);
 	}
 
-	public String getNextMacAddress() throws ClassNotFoundException, SQLException, IOException {
+	public String getNextMacAddress() throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return databaseSerialNumberProfile.getNextMacAddress();
 	}
 
@@ -188,47 +189,47 @@ public class Database extends Observable {
 		return getInstance().defaultProperties;
 	}
 
-	public static List<DeviceType> getDeviceTypes(String unitType) throws ClassNotFoundException, SQLException, IOException {
+	public static List<DeviceType> getDeviceTypes(String unitType) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return getInstance().databaseDeviceTypes.getTypes(unitType);
 	}
 
-	public static List<DeviceType> getDeviceSubtypes() throws ClassNotFoundException, SQLException, IOException {
+	public static List<DeviceType> getDeviceSubtypes() throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return getInstance().databaseDeviceTypes.getSubtypes();
 	}
 
-	public static List<String> getProductDescriptions(int deviceType, int subtype) throws IOException, ClassNotFoundException, SQLException {
+	public static List<String> getProductDescriptions(int deviceType, int subtype) throws IOException, ClassNotFoundException, SQLException, InterruptedException {
 		return getInstance().databaseSerialNumberProfile.getValues(deviceType, subtype, 3);
 	}
 
-	public static List<String> getPartNumbers(int deviceType, int subtype) throws ClassNotFoundException, SQLException, IOException {
+	public static List<String> getPartNumbers(int deviceType, int subtype) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return getInstance().databaseSerialNumberProfile.getValues(deviceType, subtype, 4);
 	}
 
-	public static List<String> getPartNumbers(String description) throws IOException, ClassNotFoundException, SQLException {
+	public static List<String> getPartNumbers(String description) throws IOException, ClassNotFoundException, SQLException, InterruptedException {
 		return getInstance().databaseSerialNumberProfile.getValues(4, 3, description);
 	}
 
-	public static List<String> getDescriptions(String partNumber) throws IOException, ClassNotFoundException, SQLException {
+	public static List<String> getDescriptions(String partNumber) throws IOException, ClassNotFoundException, SQLException, InterruptedException {
 		return getInstance().databaseSerialNumberProfile.getValues(3, 4, partNumber);
 	}
 
-	public static List<ValueDescription> getPowerDetectorSources() throws ClassNotFoundException, SQLException, IOException {
+	public static List<ValueDescription> getPowerDetectorSources() throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return getInstance().databaseDeviceTypes.getProfileVariablesPossibleValues(9);
 	}
 
-	public static List<String> getSystemNameByPartNumber(String partNumber) throws ClassNotFoundException, SQLException, IOException {
+	public static List<String> getSystemNameByPartNumber(String partNumber) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return getInstance().databaseSerialNumberProfile.getValues(15, 4, partNumber);
 	}
 
-	public static List<String> getSystemNameByDescription(String description) throws ClassNotFoundException, SQLException, IOException {
+	public static List<String> getSystemNameByDescription(String description) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return getInstance().databaseSerialNumberProfile.getValues(15, 3, description);
 	}
 
-	public static UnitType getUnitType(String unitTypeStr) throws ClassNotFoundException, SQLException, IOException {
+	public static UnitType getUnitType(String unitTypeStr) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return getInstance().databaseDeviceTypes.getUnitType(unitTypeStr);
 	}
 
-	public static ProfileVariable getProfileVariavle(String profileVariableStr) throws ClassNotFoundException, SQLException, IOException {
+	public static ProfileVariable getProfileVariavle(String profileVariableStr) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return getInstance().databaseDeviceTypes.getProfileVariavle(profileVariableStr);
 	}
 }

@@ -24,6 +24,7 @@ public abstract class AbstractTableModel extends javax.swing.table.AbstractTable
 	private int editableRow = -1;
 
 	public AbstractTableModel(String[] columnNames) {
+		logger.info("* Start *");
 		this.columnNames = columnNames;
 	}
 

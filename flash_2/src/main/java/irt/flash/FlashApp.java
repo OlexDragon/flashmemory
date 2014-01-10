@@ -30,7 +30,6 @@ public class FlashApp extends JFrame {
 	 * Launch the application.
 	 */
 	public static void main(String[] args) {
-		logger.info("*** Application Starts ***");
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
@@ -47,6 +46,7 @@ public class FlashApp extends JFrame {
 	 * Create the frame.
 	 */
 	public FlashApp() {
+		logger.info("*** Application Starts ***");
 		addWindowListener(new WindowAdapter() {
 			@Override
 			public void windowClosing(WindowEvent arg0) {

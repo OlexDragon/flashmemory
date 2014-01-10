@@ -30,12 +30,13 @@ public abstract class EditPanel<T> extends JPanel {
 	}
 
 	protected Color color;
-	protected Set<T> oldValues = new LinkedHashSet<>();
+	protected volatile Set<T> oldValues = new LinkedHashSet<>();
 	private final ProfileProperties profileProperties;
 	private Scope scope;
 
 	public EditPanel(String title, ProfileProperties profileProperties) throws ClassNotFoundException, SQLException, IOException {
-		
+		logger.info("* Start * {}", this);
+
 		color = getBackground();
 		this.profileProperties = profileProperties;
 		setScope(profileProperties);

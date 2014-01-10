@@ -22,7 +22,7 @@ public class DatabaseDeviceTypesTest {
 	}
 
 	@Test
-	public void testGet() throws ClassNotFoundException, SQLException, IOException {
+	public void testGet() throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		assertNotNull(databaseDeviceTypes.getTypes(Address.BIAS.toString()));
 	}
 

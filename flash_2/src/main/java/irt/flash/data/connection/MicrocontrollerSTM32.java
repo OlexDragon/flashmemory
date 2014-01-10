@@ -253,6 +253,10 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	private int waitTime = 500;
 	private volatile Answer lastAnswer;
 
+	private MicrocontrollerSTM32() {
+		logger.info("* Start *");
+	}
+
 	public static MicrocontrollerSTM32 getInstance(FlashSerialPort serialPort) {
 		MicrocontrollerSTM32.serialPort = serialPort;
 		return getInstance();
@@ -260,9 +264,6 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
 	public static MicrocontrollerSTM32 getInstance() {
 		return microcontrollerSTM32;
-	}
-
-	private MicrocontrollerSTM32() {
 	}
 
 	@Override
@@ -299,8 +300,8 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 							if (readFrom < buffer.length)
 								notifyObservers(percent);
 							else {
-								notifyObservers(new BigDecimal(100));
 								notifyObservers(new Status[] { Status.WRITING.setMessage("Flash Memory Write is Completed"), Status.BUTTON.setMessage("Ok") });
+								notifyObservers(new BigDecimal(100));
 								break;
 							}
 						} else {

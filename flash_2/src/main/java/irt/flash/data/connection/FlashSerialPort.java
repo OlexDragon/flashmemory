@@ -17,6 +17,7 @@ public class FlashSerialPort extends SerialPort {
 
 	public FlashSerialPort(String portName) {
 		super(portName);
+		logger.info("* Start *");
 	}
 
 	public synchronized boolean wait(int eventValue, int waitTime) throws SerialPortException {

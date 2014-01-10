@@ -14,27 +14,27 @@ import org.junit.Test;
 public class DatabaseTest {
 
 	@Test
-	public void getPartNumbersTest() throws ClassNotFoundException, SQLException, IOException{
+	public void getPartNumbersTest() throws ClassNotFoundException, SQLException, IOException, InterruptedException{
 		List<String> partNumbers = Database.getPartNumbers("'40W PicoBUC Ku-Band Extended'");
 		assertEquals(1, partNumbers.size());
 		assertEquals("TPB-KXB0460-HMS1", partNumbers.get(0));
 	}
 
 	@Test
-	public void getDescriptionsTest() throws ClassNotFoundException, SQLException, IOException{
+	public void getDescriptionsTest() throws ClassNotFoundException, SQLException, IOException, InterruptedException{
 		List<String> partNumbers = Database.getDescriptions("TPB-KXB0460-HMS1");
 		assertEquals(1, partNumbers.size());
 		assertEquals("'40W PicoBUC Ku-Band Extended'", partNumbers.get(0));
 	}
 
 	@Test
-	public void getDeviceTypesTest() throws ClassNotFoundException, SQLException, IOException{
+	public void getDeviceTypesTest() throws ClassNotFoundException, SQLException, IOException, InterruptedException{
 		List<DeviceType> deviceTypes = Database.getDeviceTypes(Address.BIAS.toString());
 		assertEquals(2, deviceTypes.size());
 	}
 
 	@Test
-	public void getSystemNameByPartNumberTest() throws ClassNotFoundException, SQLException, IOException{
+	public void getSystemNameByPartNumberTest() throws ClassNotFoundException, SQLException, IOException, InterruptedException{
 		List<String> systemName = Database.getSystemNameByPartNumber("TPB-KXB0490-HMS0");
 		assertEquals(1, systemName.size());
 		systemName = Database.getSystemNameByPartNumber("TPB-CB00430-HMA0");
@@ -44,7 +44,7 @@ public class DatabaseTest {
 	}
 
 	@Test
-	public void getSystemNameByDescriptionTest() throws ClassNotFoundException, SQLException, IOException{
+	public void getSystemNameByDescriptionTest() throws ClassNotFoundException, SQLException, IOException, InterruptedException{
 		List<String> systemName = Database.getSystemNameByDescription("'100W AntBUC Ku-Band Extended'");
 		assertEquals(1, systemName.size());
 		systemName = Database.getSystemNameByDescription("'40W L to C Band BUC'");

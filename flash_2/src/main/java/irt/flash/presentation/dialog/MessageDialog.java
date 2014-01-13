@@ -135,7 +135,6 @@ public class MessageDialog extends JDialog{
 	}
 
 	public synchronized void setMessage(Object message){
-		logger.trace(message);
 
 		if(dialogWorker!=null)
 			dialogWorker.cancel(true);
@@ -162,7 +161,7 @@ public class MessageDialog extends JDialog{
 			return null;
 		}
 
-		private synchronized <T> void set(T message) {
+		private synchronized <T> void set(T message) throws InterruptedException {
 			if(message!=null){
 				if(message instanceof Status[]){
 					logger.trace("(Status[])message={}", message);
@@ -185,22 +184,18 @@ public class MessageDialog extends JDialog{
 			}
 		}
 
-		private void setMessage(String text) {
+		private void setMessage(String text) throws InterruptedException {
 			logger.entry(text);
 
-			if (!isCancelled()) {
-				textArea.setText(text);
-				if (isCancelled()) {
-					button.setText("Ok");
-					if (!isCancelled())
-						resize();
-				}
-			}
+			textArea.setText(text);
+			button.setText("Ok");
+			Thread.sleep(1);
+			resize();
 
 			logger.exit();
 		}
 
-		private void setMessage(Status[] statuses) {
+		private void setMessage(Status[] statuses) throws InterruptedException {
 			logger.entry((Object)statuses);
 
 			for (Status s : statuses){
@@ -212,7 +207,7 @@ public class MessageDialog extends JDialog{
 			logger.exit();
 		}
 
-		private void setMessage(Status status) {
+		private void setMessage(Status status) throws InterruptedException {
 			logger.entry(status);
 
 			switch (status) {
@@ -238,7 +233,7 @@ public class MessageDialog extends JDialog{
 			logger.exit();
 		}
 
-		private void setProgressBar(BigDecimal bigDecimal) {
+		private void setProgressBar(BigDecimal bigDecimal) throws InterruptedException {
 			logger.entry(bigDecimal);
 			int progress = bigDecimal.multiply(new BigDecimal(100)).intValueExact();
 			progressBar.setValue(progress);
@@ -250,10 +245,11 @@ public class MessageDialog extends JDialog{
 			logger.exit();
 		}
 
-		private synchronized void resize() {
+		private synchronized void resize() throws InterruptedException {
 			logger.entry();
+			Thread.sleep(1);
 			pack();
-			if (!isCancelled()) {
+
 				Rectangle bounds = getOwner().getBounds();
 				Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
 
@@ -273,7 +269,7 @@ public class MessageDialog extends JDialog{
 					appHeight = appHeight + tmp;
 				int y = (int) (appY + (appHeight - getHeight()) / 2);
 
-				if (!isCancelled()) {
+				Thread.sleep(1);
 					logger.trace("Location: x={}, y={}", x, y);
 					setLocation(x, y);
 
@@ -288,8 +284,6 @@ public class MessageDialog extends JDialog{
 								}
 							}
 						});
-				}
-			}
 			logger.exit();
 		}
 	}

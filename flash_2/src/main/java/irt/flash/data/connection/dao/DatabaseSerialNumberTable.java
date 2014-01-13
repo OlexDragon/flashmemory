@@ -54,7 +54,7 @@ public class DatabaseSerialNumberTable {
 		return rowId;
 	}
 
-	private long addRow(Connection connection, long serialNumberId, long profileVariableId, BigDecimal key, BigDecimal value) throws SQLException {
+	private long addRow(Connection connection, long serialNumberId, long profileVariableId, BigDecimal key, BigDecimal value){
 		logger.entry(serialNumberId, profileVariableId, key, value);
 
 		String sql = sqlProperties.getProperty("insert_serial_number_table_row");
@@ -72,6 +72,9 @@ public class DatabaseSerialNumberTable {
 				if (generatedKeys.next())
 					rowId = generatedKeys.getLong(1);
 			}
+		} catch (SQLException e) {
+			logger.error("serialNumberId={}, profileVariableId={}, key={}, value={}", serialNumberId, profileVariableId, key, value);
+			logger.catching(e);
 		}
 		return logger.exit(rowId);
 	}

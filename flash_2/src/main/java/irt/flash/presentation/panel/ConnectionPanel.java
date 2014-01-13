@@ -183,8 +183,9 @@ public class ConnectionPanel extends JPanel implements Observer {
 								FlashConnector.write( (String) comboBoxComPort.getSelectedItem(),
 										new byte[]{0x7E, (byte) 0xFE, 0x00, 0x00, 0x00, 0x03, 0x00, 0x78, 0x64, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x5A, 0x51, 0x7E}
 								);
+								dialog.setMessage("Wait please.");
 								synchronized (this) {
-									wait(1000);
+									wait(2000);
 								}
 								new ConnectionWorker().execute();
 							} catch (Exception e) {

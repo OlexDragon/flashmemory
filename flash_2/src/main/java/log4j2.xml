@@ -17,7 +17,7 @@
 	</Appenders>
 
 	<Loggers>
-	<logger name="irt.flash.presentation.dialog.MessageDialog" level="error" />
+	<logger name="irt.flash.presentation.dialog.MessageDialog" level="all" />
 	<logger name="irt.flash.presentation.dialog.MessageDialog$DialogWorker" level="error" />
 
 	<logger name="irt.flash.presentation.panel.ConnectionPanel" level="error" />
@@ -30,7 +30,7 @@
 	<logger name="irt.flash.presentation.panel.edit_profile.ProductDescriptionPanel" level="error" />
 	<logger name="irt.flash.presentation.panel.edit_profile.SystemNamePanel" level="error" />
 	<logger name="irt.flash.presentation.panel.edit_profile.MacAddressPanel" level="error" />
-	<logger name="irt.flash.presentation.panel.edit_profile.DevicePartNumberPanel" level="all" />
+	<logger name="irt.flash.presentation.panel.edit_profile.DevicePartNumberPanel" level="error" />
 	<logger name="irt.flash.presentation.panel.edit_profile.DeviceTypePanel" level="error" />
 	<logger name="irt.flash.presentation.panel.edit_profile.DeviceSubtypePanel" level="error" />
 

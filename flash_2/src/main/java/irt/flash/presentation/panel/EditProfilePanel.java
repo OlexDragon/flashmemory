@@ -116,8 +116,16 @@ public class EditProfilePanel extends JScrollPane implements Observer {
 	}
 
 	public void resetProfileVariables() {
-		for (EditPanel<?> ep : panels)
-			ep.reset();
+		new SwingWorker<Void, Void>() {
+			@Override
+			protected Void doInBackground() throws Exception {
+				for (EditPanel<?> ep : panels){
+					logger.trace("Reset = {}", ep);
+					ep.reset();
+				}
+				return null;
+			}
+		};
 	}
 
 	@Override
@@ -166,8 +174,6 @@ public class EditProfilePanel extends JScrollPane implements Observer {
 
 	// ************************************************************************************
 	private class UnitTypeWorker extends SwingWorker<UnitType, String> {
-
-		private final Logger logger = (Logger) LogManager.getLogger();
 
 		private String unitTypeStr;
 

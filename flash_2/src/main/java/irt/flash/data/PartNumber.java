@@ -1,6 +1,10 @@
 package irt.flash.data;
 
+import irt.flash.data.connection.MicrocontrollerSTM32.ProfileProperties;
+
 public class PartNumber {
+
+	public static final ProfileProperties PROFILE_PROPERTIE = ProfileProperties.DEVICE_PART_NUMBER;
 
 	private long id;
 	private String partNumber;

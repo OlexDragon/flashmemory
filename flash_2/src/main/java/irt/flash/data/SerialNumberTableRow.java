@@ -29,7 +29,7 @@ public class SerialNumberTableRow {
 	public BigDecimal getValue() {
 		return value;
 	}
-	public boolean isStatus() {
+	public boolean isActive() {
 		return status;
 	}
 	public Timestamp getDate() {
@@ -70,6 +70,7 @@ public class SerialNumberTableRow {
 		this.statusChangeDate = statusChangeDate;
 		return this;
 	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;

@@ -1,5 +1,6 @@
 package irt.flash.data.connection.dao;
 
+import irt.flash.data.Profile;
 import irt.flash.data.SerialNumber;
 
 import java.io.IOException;
@@ -56,21 +57,24 @@ public class DatabaseSerialNumbers {
 		return executeUpdate;
 	}
 
-	public long add(Connection connection, String serialNumberStr) throws SQLException{
+	public SerialNumber add(Connection connection, String serialNumberStr) throws SQLException{
 
 		String sql = sqlProperties.getProperty("insert_serial_number");
 		logger.trace(sql);
 
-		long serialNumberId = 0;
+		SerialNumber serialNumber = null;
 		try (PreparedStatement statement = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS)) {
 			statement.setString(1, serialNumberStr);
 			if (statement.executeUpdate() > 0) {
 				ResultSet generatedKeys = statement.getGeneratedKeys();
-				if (generatedKeys.next())
-					serialNumberId = generatedKeys.getLong(1);
+				if (generatedKeys.next()){
+					serialNumber = new SerialNumber();
+					serialNumber.setId(generatedKeys.getLong(1));
+					serialNumber.setSerialNumber(serialNumberStr);
+				}
 			}
 		}
-		return serialNumberId;
+		return serialNumber;
 	}
 
 	public SerialNumber get(Connection connection, String serialNumberStr) throws SQLException, NullPointerException {
@@ -89,6 +93,9 @@ public class DatabaseSerialNumbers {
 					serialNumber.setId(resultSet.getLong("id"));
 					serialNumber.setSerialNumber(resultSet.getString("serial_number"));
 					serialNumber.setDate(resultSet.getTimestamp("date"));
+					serialNumber.setProfile(resultSet.getString("profile"));
+					serialNumber.setProfileChangeDate(resultSet.getTimestamp("profile_change_date"));
+					serialNumber.setSoftwareId(resultSet.getInt("id_software"));
 				}
 			}
 		}
@@ -143,20 +150,28 @@ public class DatabaseSerialNumbers {
 		return serialNumber;
 	}
 
-	public boolean profileIsChanged(Connection connection, long serialNumberId, String profileStr) throws SQLException {
+	public boolean profileIsChanged(Connection connection, long serialNumberId, Profile profile) throws SQLException {
+		logger.entry(serialNumberId, profile);
 
-		boolean isChanged = false;
-		String sql = sqlProperties.getProperty("profile_have_been_changed");
+		boolean isChanged;
+		String sql = sqlProperties.getProperty("select_serial_number_by_id");
+		logger.trace(sql);
 
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
 			statement.setLong(1, serialNumberId);
-			statement.setString(2, profileStr);
 			try(ResultSet resultSet = statement.executeQuery()){
-				isChanged = !resultSet.next();
+				if(resultSet.next()){
+					Profile dbProfile = Profile.parseProfile(resultSet.getString("profile"));
+					logger.trace(dbProfile);
+					if(dbProfile!=null)
+						isChanged = !dbProfile.equals(profile);
+					else
+						isChanged = profile!=null;
+				}else
+					isChanged = true;//Serial Number does not exist
 			}
 		}
-		logger.info("serialNumberId={}, profileStr={}, isChanged=>{}, sql={}", serialNumberId, profileStr, isChanged, sql);
-		return isChanged;
+		return logger.exit(isChanged);
 	}
 
 	public int setProfile(Connection connection, long serialNumberId, String profileStr) throws SQLException {
@@ -165,8 +180,8 @@ public class DatabaseSerialNumbers {
 
 		int executeUpdate = 0;
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
-			statement.setLong(2, serialNumberId);
 			statement.setString(1, profileStr);
+			statement.setLong(2, serialNumberId);
 			executeUpdate = statement.executeUpdate();
 		}
 		logger.info("serialNumberId={}, profileStr={}, executeUpdate=>{}, sql={}", serialNumberId, profileStr, executeUpdate, sql);

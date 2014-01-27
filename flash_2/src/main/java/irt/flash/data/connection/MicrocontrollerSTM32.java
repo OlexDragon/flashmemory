@@ -273,7 +273,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		super.notifyObservers(obj);
 	}
 
-	private boolean writeToFlashMemory() throws SerialPortException {
+	private boolean writeToFlashMemory() throws SerialPortException, InterruptedException {
 		logger.entry();
 
 		int length = 256;
@@ -300,8 +300,9 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 							if (readFrom < buffer.length)
 								notifyObservers(percent);
 							else {
-								notifyObservers(new Status[] { Status.WRITING.setMessage("Flash Memory Write is Completed"), Status.BUTTON.setMessage("Ok") });
 								notifyObservers(new BigDecimal(100));
+								Thread.sleep(200);
+								notifyObservers(new Status[] { Status.WRITING.setMessage("Flash Memory Write is Completed"), Status.BUTTON.setMessage("Ok") });
 								break;
 							}
 						} else {
@@ -566,12 +567,8 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		return logger.exit(address);
 	}
 
-	public static void write(String selectedItem, String fileContents) throws InterruptedException {
-		write(getAddress(selectedItem), fileContents);
-	}
-
-	private static void write(Address address, String fileContents) throws InterruptedException {
-		MicrocontrollerSTM32.address = address;
+	public static void writeProfile(String selectedItem, String fileContents) throws InterruptedException {
+		address = getAddress(selectedItem);
 		buffer = fileContents.getBytes();
 		runThread(Command.WRITE_MEMORY);
 	}

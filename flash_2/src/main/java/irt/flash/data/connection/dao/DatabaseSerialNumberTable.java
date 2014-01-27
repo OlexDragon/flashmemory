@@ -26,87 +26,104 @@ public class DatabaseSerialNumberTable {
 		this.sqlProperties = sqlProperties;
 	}
 
-	public long set(Connection connection, long serialNumberId, long profileVariableId, BigDecimal key, BigDecimal value) throws SQLException {
+	public SerialNumberTableRow setTableRow(Connection connection, long serialNumberId, long profileVariableId, BigDecimal key, BigDecimal value) throws SQLException {
+		logger.entry(serialNumberId, profileVariableId, key, value);
 
-		long rowId = getRow(connection, serialNumberId, profileVariableId, key, value);
-		if(rowId<=0)
-			rowId = addRow(connection, serialNumberId, profileVariableId, key, value);
-		return rowId;
-		
+		SerialNumberTableRow row = getRow(connection, serialNumberId, profileVariableId, key, value);
+
+		if(row.getId()==0)
+			row = addRow(connection, row);
+		else{
+			row.setStatus(setActive(connection, row.getId(), true)>0);
+		}
+
+		return logger.exit(row);
 	}
 
-	private long getRow(Connection connection, long serialNumberId, long profileVariableId, BigDecimal key, BigDecimal value) throws SQLException {
+	private SerialNumberTableRow getRow(Connection connection, long serialNumberId, long profileVariableId, BigDecimal key, BigDecimal value) throws SQLException {
+		logger.entry(serialNumberId, profileVariableId, key, value);
 
-		String sql = sqlProperties.getProperty("active_serial_number_table_row");
+		String sql = sqlProperties.getProperty("select_serial_number_table_row");
 		logger.trace(sql);
 
-		long rowId = 0;
+		SerialNumberTableRow row = new SerialNumberTableRow()
+													.setSerialNumberId(serialNumberId)
+													.setTableNameId(profileVariableId)
+													.setKey(key).setValue(value);
+
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
 			statement.setLong(1, serialNumberId);
 			statement.setLong(2, profileVariableId);
 			statement.setBigDecimal(3, key);
 			statement.setBigDecimal(4, value);
 			try(ResultSet resultSet = statement.executeQuery()){
-				if(resultSet.next())
-					rowId = resultSet.getLong("id");
+				if(resultSet.next()){
+					row.setId(resultSet.getLong("id"));
+					row.setDate(resultSet.getTimestamp("date"));
+					row.setStatus(resultSet.getBoolean("status"));
+					row.setStatusChangeDate(resultSet.getTimestamp("status_change_date"));
+				}
 			}
 		}
-		return rowId;
+		return logger.exit(row);
 	}
 
-	private long addRow(Connection connection, long serialNumberId, long profileVariableId, BigDecimal key, BigDecimal value){
-		logger.entry(serialNumberId, profileVariableId, key, value);
+	private SerialNumberTableRow addRow(Connection connection, SerialNumberTableRow serialNumberTableRow){
+		logger.entry(serialNumberTableRow);
 
 		String sql = sqlProperties.getProperty("insert_serial_number_table_row");
 		logger.trace(sql);
 
-		long rowId = 0;
 		try (PreparedStatement statement = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS)) {
-			statement.setLong(1, serialNumberId);
-			statement.setLong(2, profileVariableId);
-			statement.setBigDecimal(3, key);
-			statement.setBigDecimal(4, value);
+			statement.setLong(1, serialNumberTableRow.getSerialNumberId());
+			statement.setLong(2, serialNumberTableRow.getTableNameId());
+			statement.setBigDecimal(3, serialNumberTableRow.getKey());
+			statement.setBigDecimal(4, serialNumberTableRow.getValue());
 			statement.setBoolean(5, true);
 			if (statement.executeUpdate() > 0) {
 				ResultSet generatedKeys = statement.getGeneratedKeys();
 				if (generatedKeys.next())
-					rowId = generatedKeys.getLong(1);
+					serialNumberTableRow.setId(generatedKeys.getLong(1));
 			}
 		} catch (SQLException e) {
-			logger.error("serialNumberId={}, profileVariableId={}, key={}, value={}", serialNumberId, profileVariableId, key, value);
+			logger.error(serialNumberTableRow);
 			logger.catching(e);
 		}
-		return logger.exit(rowId);
+		return logger.exit(serialNumberTableRow);
 	}
 
-	public void setActive(Connection connection, long serialNumberId, long profileVariableId, TreeMap<BigDecimal, BigDecimal> tableMap) throws SQLException {
-		logger.entry(profileVariableId, tableMap);
-		List<SerialNumberTableRow> trs = getActiveRows(connection, serialNumberId, profileVariableId);
+	public void setNotActive(Connection connection, long serialNumberId, long profileVariableId, TreeMap<BigDecimal, BigDecimal> tableMap) throws SQLException {
+		logger.entry(serialNumberId, profileVariableId, tableMap);
+
+		List<SerialNumberTableRow> trs = getTableRows(connection, serialNumberId, profileVariableId);
+
 		if(trs!=null){
 			for(SerialNumberTableRow tr:trs){
 				BigDecimal value = tableMap.get(tr.getKey());
-				if(value==null || tr.getValue().compareTo(value)!=0)
+				if(value==null || tr.getValue().compareTo(value)!=0 && tr.isActive())
 					setActive(connection, tr.getId(), false);
 			}
 		}
 		logger.exit();
 	}
 
-	private void setActive(Connection connection, long rowId, boolean status) throws SQLException {
+	private int setActive(Connection connection, long rowId, boolean status) throws SQLException {
 
 		String sql = sqlProperties.getProperty("update_active_serial_number_table_row");
 		logger.trace(sql);
 
+		int executeUpdate;
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
 			statement.setBoolean(1, status);
 			statement.setLong(2, rowId);
-			statement.executeUpdate();
+			executeUpdate = statement.executeUpdate();
 		}
+		return executeUpdate;
 	}
 
-	private List<SerialNumberTableRow> getActiveRows(Connection connection, long serialNumberId, long profileVariableId) throws SQLException {
+	private List<SerialNumberTableRow> getTableRows(Connection connection, long serialNumberId, long profileVariableId) throws SQLException {
 
-		String sql = sqlProperties.getProperty("active_serial_number_table");
+		String sql = sqlProperties.getProperty("select_serial_number_table");
 		logger.trace(sql);
 
 		List<SerialNumberTableRow> rows = null;
@@ -114,7 +131,7 @@ public class DatabaseSerialNumberTable {
 			statement.setLong(1, serialNumberId);
 			statement.setLong(2, profileVariableId);
 			try(ResultSet resultSet = statement.executeQuery()){
-				if(resultSet.next())
+				if(resultSet.next()){
 					rows = new ArrayList<>();
 					do{
 						rows.add(new SerialNumberTableRow()	.setId(resultSet.getLong("id"))
@@ -126,6 +143,7 @@ public class DatabaseSerialNumberTable {
 															.setDate(resultSet.getTimestamp("date"))
 															.setStatusChangeDate(resultSet.getTimestamp("status_change_date")));
 					}while(resultSet.next());
+				}
 			}
 		}
 		return rows;

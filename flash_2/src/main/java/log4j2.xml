@@ -17,8 +17,7 @@
 	</Appenders>
 
 	<Loggers>
-	<logger name="irt.flash.presentation.dialog.MessageDialog" level="all" />
-	<logger name="irt.flash.presentation.dialog.MessageDialog$DialogWorker" level="error" />
+	<logger name="irt.flash.presentation.dialog.MessageDialog" level="error" />
 
 	<logger name="irt.flash.presentation.panel.ConnectionPanel" level="error" />
 	<logger name="irt.flash.presentation.panel.EditProfilePanel" level="error" />
@@ -47,11 +46,11 @@
 	<logger name="irt.flash.data.connection.MicrocontrollerSTM32" level="error" />
 
 	<logger name="irt.flash.data.connection.dao.MySQLConnector" level="error" />
-	<logger name="irt.flash.data.connection.dao.Database" level="error" />
+	<logger name="irt.flash.data.connection.dao.DatabaseController" level="error" />
+	<logger name="irt.flash.data.connection.dao.Database" level="debug" />
 	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberProfile" level="error" />
 	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumbers" level="error" />
 	<logger name="irt.flash.data.connection.dao.DatabaseSerialNumberTable" level="error" />
-	<logger name="irt.flash.data.connection.dao.DatabaseController" level="error" />
 
 		<Root level="WARN">
 			<AppenderRef ref="STDOUT" />

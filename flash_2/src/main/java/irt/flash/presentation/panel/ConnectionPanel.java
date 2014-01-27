@@ -5,6 +5,7 @@ import irt.flash.data.connection.FlashConnector;
 import irt.flash.data.connection.MicrocontrollerSTM32;
 import irt.flash.data.connection.MicrocontrollerSTM32.Address;
 import irt.flash.data.connection.MicrocontrollerSTM32.Answer;
+import irt.flash.data.connection.MicrocontrollerSTM32.ProfileProperties;
 import irt.flash.data.connection.MicrocontrollerSTM32.Status;
 import irt.flash.data.connection.dao.DatabaseController;
 import irt.flash.presentation.dialog.MessageDialog;
@@ -26,13 +27,18 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.StringReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.Properties;
 import java.util.Scanner;
+import java.util.concurrent.ExecutionException;
 import java.util.prefs.Preferences;
 
 import javax.swing.DefaultComboBoxModel;
@@ -62,6 +68,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 
 public class ConnectionPanel extends JPanel implements Observer {
+	public static final String UPLOAD_DATE = "#Upload Date:";
+
 	private static final long serialVersionUID = -79571598522363841L;
 
 	private final Logger logger = (Logger) LogManager.getLogger();
@@ -173,32 +181,34 @@ public class ConnectionPanel extends JPanel implements Observer {
 		btnRead = new JButton("Read");
 		btnRead.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-				if(btnRead.getText().equals(FCM_UPGRADE)){
-					new SwingWorker<Void, Void>(){
-
-						@Override
-						protected Void doInBackground() throws Exception {
-							comboBoxUnitType.setSelectedItem(Address.CONVERTER.toString());
-							try {
-								FlashConnector.write( (String) comboBoxComPort.getSelectedItem(),
-										new byte[]{0x7E, (byte) 0xFE, 0x00, 0x00, 0x00, 0x03, 0x00, 0x78, 0x64, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x5A, 0x51, 0x7E}
-								);
-								dialog.setMessage("Wait please.");
-								synchronized (this) {
-									wait(2000);
-								}
-								new ConnectionWorker().execute();
-							} catch (Exception e) {
-								logger.catching(e);
-								JOptionPane.showMessageDialog(null, e.getLocalizedMessage());
-							}
-							return null;
-						}
-						
-					}.execute();
-				}else{
+				if(btnRead.getText().equals(FCM_UPGRADE))
+					connectToConverter();
+				else
 					readProfile();
-				}
+			}
+
+			private void connectToConverter() {
+				new SwingWorker<Void, Void>(){
+					@Override
+					protected Void doInBackground() throws Exception {
+						comboBoxUnitType.setSelectedItem(Address.CONVERTER.toString());
+						try {
+							FlashConnector.write( (String) comboBoxComPort.getSelectedItem(),
+									new byte[]{0x7E, (byte) 0xFE, 0x00, 0x00, 0x00, 0x03, 0x00, 0x78, 0x64, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x5A, 0x51, 0x7E}
+							);
+							dialog.setMessage("Wait please.");
+							synchronized (this) {
+								wait(2000);
+							}
+							new ConnectionWorker().execute();
+						} catch (Exception e) {
+							logger.catching(e);
+							JOptionPane.showMessageDialog(null, e.getLocalizedMessage());
+						}
+						return null;
+					}
+					
+				}.execute();
 			}
 		});
 		btnRead.setMargin(new Insets(0, 0, 0, 0));
@@ -321,49 +331,93 @@ public class ConnectionPanel extends JPanel implements Observer {
 							if(textPane.getText().isEmpty())
 								dialog.setMessage("First Have to Read Profile.");
 							else
-							try {
-								uploadFromFile();
-							} catch (Exception e) {
-								logger.catching(e);
-							}
+								try { uploadProfileFromFile(); } catch (Exception e) { logger.catching(e); }
 						}
 						return null;
 					}
 
-					private void uploadFromFile() throws FileNotFoundException, InterruptedException {
+					private void uploadProfileFromFile() throws FileNotFoundException, InterruptedException {
 
 						JFileChooser fc = new JFileChooser();
+						fc.setDialogTitle("Upload Profile...");
+						fc.setApproveButtonToolTipText("Upload selected profile.");
 						fc.setMultiSelectionEnabled(false);
-						fc.setDialogTitle("Open Profile");
 
 						FileNameExtensionFilter fileNameExtensionFilter = new FileNameExtensionFilter("Bin files(bin)", "bin");
 						fc.addChoosableFileFilter(fileNameExtensionFilter);
 						fc.setFileFilter(fileNameExtensionFilter);
 
-						String pathStr = prefs.get("profilePath", null);
 						Path p = null;
+						Object selectedUnitType = comboBoxUnitType.getSelectedItem();
+						String key = selectedUnitType+" profilePath";
+						String pathStr = prefs.get(key, null);
+
 						if(pathStr!=null){
 							p = Paths.get(pathStr);
 							fc.setSelectedFile(p.toFile());
 						}
 
-						if(fc.showSaveDialog(ConnectionPanel.this)==JFileChooser.APPROVE_OPTION ){
+						if(fc.showDialog(ConnectionPanel.this, "Upload")==JFileChooser.APPROVE_OPTION ){
 							File file = fc.getSelectedFile();
-							String path = file.getAbsolutePath();
-							if(p==null || !path.equals(pathStr)) {
-								prefs.put("profilePath", path);
-							}
 
 							String fileContents = new String();
 							try(Scanner scanner = new Scanner(file)) {
 								while(scanner.hasNextLine())
 									fileContents += scanner.nextLine()+"\n";
 							}
-							databaseController.update(fileContents);
 
 							if(!fileContents.isEmpty()){
-								fileContents += '\0';
-								MicrocontrollerSTM32.write((String) comboBoxUnitType.getSelectedItem(), fileContents);
+								Properties properties = new Properties();
+								try {
+									properties.load(new StringReader(fileContents));
+								} catch (IOException e) {
+									logger.catching(e);
+								}
+
+								logger.debug(properties);
+								String deviceTypeStr = properties.getProperty(ProfileProperties.DEVICE_TYPE.toString());
+
+								if(deviceTypeStr!=null && !(deviceTypeStr=deviceTypeStr.replaceAll("\\D", "")).isEmpty()){
+
+									int deviceType = Integer.parseInt(deviceTypeStr);
+									boolean bais = deviceType<1000;
+
+									logger.debug("deviceType={}, bais={}", deviceType, bais);
+
+									boolean upload = true;
+
+									if((selectedUnitType.equals(Address.CONVERTER.toString()) && bais) || (selectedUnitType.equals(Address.BIAS.toString()) && !bais)) {
+
+										String message = "Selected Profile is created for "+(bais ? Address.BIAS.toString() : Address.CONVERTER.toString())+
+												"\nbut selected 'Unit Type' is "+selectedUnitType+
+												".\n\nTo continue press 'OK' button.\n";
+
+										upload = JOptionPane.showConfirmDialog(ConnectionPanel.this, message, "Warning", JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION;
+									}
+
+									if(upload){
+
+										String path = file.getAbsolutePath();
+										if(p==null || !path.equals(pathStr)) {
+											prefs.put(key, path);
+										}
+
+										try {
+											if(databaseController.update(fileContents)){
+
+												// Time stamp
+												Date date = new Date();
+												Timestamp timestamp = new Timestamp(date.getTime());
+												fileContents += UPLOAD_DATE+timestamp+'\0';
+
+												MicrocontrollerSTM32.writeProfile((String) selectedUnitType, fileContents);
+											}
+										} catch (ExecutionException e) {
+											logger.catching(e);
+										}
+									}
+								}else
+									JOptionPane.showMessageDialog(ConnectionPanel.this, "Profile is missing 'DEVICE TYPE'");
 							}
 						}
 					}
@@ -383,6 +437,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 								try {
 									dialog.setMessage(Status.ERASE.setMessage("Memory Erasing"));
 									MicrocontrollerSTM32.erase((String) comboBoxUnitType.getSelectedItem());
+									databaseController.reset();
 								} catch (Exception e) {
 									logger.catching(e);
 								}
@@ -415,7 +470,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 								File file = new File(path);
 								if (file.exists()) {
-									writeProgram(file);
+									uploadProgram(file);
 								} else
 									dialog.setMessage("The File do not exist.");
 							}
@@ -514,7 +569,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 									if (p == null || !absolutePath.equals(pathStr)) {
 										prefs.put("programPath", absolutePath);
 									}
-									writeProgram(file);
+									uploadProgram(file);
 								}
 							}
 						}
@@ -596,6 +651,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		setLayout(groupLayout);
 
 		MicrocontrollerSTM32.getInstance().addObserver(this);
+		databaseController.setOwner(this);
 	}
 
 	private void readProfile() {
@@ -665,7 +721,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		new UpdateWorker(o, obj).execute();
 	}
 
-	private void writeProgram(File file) {
+	private void uploadProgram(File file) {
 		byte fileContents[] = new byte[(int) file.length()];
 
 		try (FileInputStream fileInputStream = new FileInputStream(file)) {
@@ -770,6 +826,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		}
 		@Override
 		protected Observable doInBackground() throws Exception {
+			logger.trace("observable={}, object={}", observable, object);
 			try{
 
 			if (object == null) {
@@ -791,11 +848,10 @@ public class ConnectionPanel extends JPanel implements Observer {
 						logger.trace("GET");
 						break;
 					case READ_MEMORY:
-						logger.trace("READ_MEMORY");
 						readMemory(stm32.getReadBytes());
 						break;
 					case WRITE_MEMORY:
-						logger.trace("WRITE_MEMORY");
+						logger.trace("switch('WRITE_MEMORY')");
 						break;
 					case USER_COMMAND:
 						logger.trace("USER_COMMAND");
@@ -842,22 +898,65 @@ public class ConnectionPanel extends JPanel implements Observer {
 				dialog.setMessage(equals ? "Equal" : "Not Equal");
 				buffer = null;
 			} else {
+				logger.debug("readBytes = {}", readBytes);
 				if (readBytes != null) {
+					readBytes = removeEnd(readBytes);
 					setTextPaneText(readBytes);
-					databaseController.setProfile(textPane.getText());
+					databaseController.setProfile(readBytes);
 				} else {
 					setLabel(lblConnection, "Can Not read Memory", Color.RED);
 				}
 			}
 		}
 
-		private void setTextPaneText(byte[] readBytes) {
-			String string = new String(readBytes);
-			int indexOf = string.indexOf('\0');
-			if (indexOf > 0)
-				string = string.substring(0, indexOf);
-			textPane.setText(string);
+		private void setTextPaneText(final byte[] readBytes) {
+
+			new SwingWorker<Void, Void>() {
+
+				@Override
+				protected Void doInBackground() throws Exception {
+					setName("setTextPaneText(final byte[] readBytes)");
+					logger.debug(readBytes);
+					if (readBytes != null) {
+						String string = new String(readBytes);
+						textPane.setText(string);
+						textPane.setForeground(Color.BLACK);
+					}else{
+						textPane.setText(comboBoxUnitType.getSelectedItem()+" does not have a Profile.");
+						textPane.setForeground(Color.RED);
+					}
+					return null;
+				}
+			}.execute();
+
 			dialog.setMessage(null);
+		}
+
+		private byte[] removeEnd(byte[] readBytes) {
+			int ffCounter = 0;
+			int offset = -1;
+
+			for(int i=0; i<readBytes.length; i++){
+				logger.trace("readBytes[{}]={}", i, readBytes[i]);
+				if(readBytes[i]==0){
+					offset = i;
+					break;
+				}else if(readBytes[i]==(byte)0xFF){
+
+					if(ffCounter==0)
+						offset = i;
+
+					else if(ffCounter>=2)
+						break;
+
+					ffCounter++;
+
+				}else
+					ffCounter = 0;
+			}
+			logger.trace("ffCounter={}, offset={}", ffCounter, offset);
+
+			return offset>0 ? Arrays.copyOfRange(readBytes, 0, offset) : null;
 		}
 	}
 

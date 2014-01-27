@@ -1,11 +1,15 @@
 package irt.flash.data;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import irt.flash.data.connection.MicrocontrollerSTM32.ProfileProperties;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -76,7 +80,7 @@ public class ProfileTest {
 										"temperature-lut-entry 74 2450";
 
 	@Test
-	public void testProfile1(){
+	public void testProfile1() throws IOException{
 		Profile p = Profile.parseProfile(profileStr);
 		assertEquals("device-type 100",  p.getProperty(ProfileProperties.DEVICE_TYPE.toString()), "100");
 		assertEquals("device-revision 0",  p.getProperty(ProfileProperties.DEVICE_REVISION.toString()), "0");
@@ -90,7 +94,7 @@ public class ProfileTest {
 	}
 
 	@Test
-	public void testProfile2(){
+	public void testProfile2() throws IOException{
 		Profile p = Profile.parseProfile(profileStr);
 
 		Table table = p.getTable("device-threshold-current");
@@ -102,7 +106,7 @@ public class ProfileTest {
 	}
 
 	@Test
-	public void testProfile3(){
+	public void testProfile3() throws IOException{
 		Profile p = Profile.parseProfile(profileStr);
 
 		Table table = p.getTable("device-threshold-temperature");
@@ -114,7 +118,7 @@ public class ProfileTest {
 	}
 
 	@Test
-	public void testProfile4(){
+	public void testProfile4() throws IOException{
 		Profile p = Profile.parseProfile(profileStr);
 
 		Table table = p.getTable("power-lut-entry");
@@ -126,7 +130,7 @@ public class ProfileTest {
 	}
 
 	@Test
-	public void testProfile5(){
+	public void testProfile5() throws IOException{
 		Profile p = Profile.parseProfile(profileStr);
 
 		Table table = p.getTable("temperature-lut-entry");
@@ -197,7 +201,19 @@ public class ProfileTest {
 
 	@Test
 	public void test10() {
+		String[] ss = new String[]{"product-description", "40W Ku-bend"};
 		String[] processLine = Profile.processLine("\n\t\tproduct-description \t\t\r40W\t\t \tKu-bend \t");
-		assertEquals("Input '\\n\\t\\tproduct-description \\t\\t\\r40W\\t\\t \\tKu-bend' output length:", 2, processLine.length);
+		System.out.println("Arrays to String"+Arrays.toString(ss));
+		System.out.println("Arrays to String"+Arrays.toString(processLine));
+		assertTrue("Input '\\n\\t\\tproduct-description \\t\\t\\r40W\\t\\t \\t40WKu-bend' output length:", Arrays.equals(ss, processLine));
+	}
+
+	@Test
+	public void test11() {
+		Profile parseProfile = Profile.parseProfile(profileStr);
+		Profile p = Profile.parseProfile(profileStr.substring(0, profileStr.length()-30));
+		assertTrue( p.equals(parseProfile));
+		p.setCompareByName(false);
+		assertFalse( p.equals(parseProfile));
 	}
 }

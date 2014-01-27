@@ -8,12 +8,22 @@ import java.util.TreeMap;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
 
+
 public class Table {
 
 	private final Logger logger = (Logger) LogManager.getLogger();
 
-	private String name;
+	protected String name;
 	private TreeMap<BigDecimal, BigDecimal> tableMap = new TreeMap<>();
+	private boolean compareByName = true;
+
+	public boolean isCompareByName() {
+		return compareByName;
+	}
+
+	public void setCompareByName(boolean compareByName) {
+		this.compareByName = compareByName;
+	}
 
 	public boolean addRow(String[] rowFields){
 		logger.entry((Object[])rowFields);
@@ -50,21 +60,6 @@ public class Table {
 		tableMap.put(entry.getKey(), entry.getValue());
 	}
 
-	@Override
-	public boolean equals(Object obj) {
-		return obj !=null ? obj.hashCode()==hashCode() : false;
-	}
-
-	@Override
-	public int hashCode() {
-		return name!=null ? name.hashCode() : super.hashCode();
-	}
-
-	@Override
-	public String toString() {
-		return "Table [name=" + name + ", tableMap=" + tableMap + "]";
-	}
-
 	public String getName() {
 		return name;
 	}
@@ -98,5 +93,53 @@ public class Table {
 		Entry<BigDecimal, BigDecimal> row = getRow(selectedRow);
 		if(row!=null)
 			tableMap.remove(row.getKey());
+	}
+
+	@Override
+	public String toString() {
+		return "Table [name=" + name + ", tableMap=" + tableMap + "]";
+	}
+
+/**
+ * By default compares by name<br>
+ * If setCompareByName(false) will compare each row of the Table
+ */
+	@Override
+	public boolean equals(Object obj) {
+		if(compareByName)
+			return obj !=null ? obj.hashCode()==hashCode() : false;
+		else{
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			Table other = (Table) obj;
+			if (name == null) {
+				if (other.name != null)
+					return false;
+			} else if (!name.equals(other.name))
+				return false;
+			if (tableMap == null) {
+				if (other.tableMap != null)
+					return false;
+			} else if (!tableMap.equals(other.tableMap))
+				return false;
+			return true;
+		}
+	}
+
+	@Override
+	public int hashCode() {
+		if(compareByName)
+			return name!=null ? name.hashCode() : super.hashCode();
+		else{
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((name == null) ? 0 : name.hashCode());
+			result = prime * result + ((tableMap == null) ? 0 : tableMap.hashCode());
+			return result;
+		}
 	}
 }

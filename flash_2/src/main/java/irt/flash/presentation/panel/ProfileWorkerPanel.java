@@ -4,8 +4,8 @@ import java.awt.BorderLayout;
 import java.util.Observable;
 import java.util.Observer;
 
-import javax.swing.JPanel;
 import javax.swing.JButton;
+import javax.swing.JPanel;
 
 public class ProfileWorkerPanel extends JPanel implements Observer {
 	private static final long serialVersionUID = 863089977016844508L;

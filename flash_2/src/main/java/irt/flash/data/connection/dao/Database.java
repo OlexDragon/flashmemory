@@ -8,16 +8,22 @@ import irt.flash.data.Table;
 import irt.flash.data.UnitType;
 import irt.flash.data.ValueDescription;
 import irt.flash.data.connection.MicrocontrollerSTM32.ProfileProperties;
+import irt.flash.presentation.panel.ConnectionPanel;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Observable;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
@@ -50,9 +56,9 @@ public class Database extends Observable {
 		databaseDeviceTypes = new DatabaseDeviceTypes(sqlProperties);
 	}
 
-	public long setProfile(String profileStr) throws ClassNotFoundException, SQLException, IOException, InterruptedException{
+	public SerialNumber setProfile(String profileStr) throws ClassNotFoundException, SQLException, IOException, InterruptedException{
 		logger.entry(profileStr);
-		long serialNumberId = 0;
+		SerialNumber serialNumber = null;
 
 		try(Connection connection = MySQLConnector.getConnection()){
 
@@ -61,18 +67,60 @@ public class Database extends Observable {
 			notifyObservers(profile);
 
 			String serialNumberStr = profile.getProperty(ProfileProperties.SERIAL_NUMBER.toString());
+			Timestamp unitProfileChangeDate = getUploadDate(profileStr);
 
 			if(serialNumberStr!=null && !serialNumberStr.toUpperCase().contains("X")){
-				serialNumberId = getSerialNumberId(connection, serialNumberStr);
-				if(databaseSerialNumber.profileIsChanged(connection, serialNumberId, profileStr)){//profile have been changed
-					databaseSerialNumber.setProfile(connection, serialNumberId, profileStr);
-					setProfile(connection, serialNumberId, profile);
-					setTables(connection, serialNumberId, profile.getTables());
+				serialNumber = getSerialNumber(connection, serialNumberStr);
+				Timestamp dbProfileChangeDate = serialNumber.getProfileChangeDate();
+				logger.debug("dbProfileChangeDate={}, unitUploadDate={}", dbProfileChangeDate, unitProfileChangeDate);
+
+				if(isCorrectDate(unitProfileChangeDate, dbProfileChangeDate)){//10*1000 = 10 minutes
+					long id = serialNumber.getId();
+					logger.debug("Serial Number ID={}", id);
+					if(!profilesAreEqual(connection, serialNumber.getProfile(), profile)){//profile have been changed
+						logger.info("Storing the Profile in the Database.");
+						databaseSerialNumber.setProfile(connection, id, profileStr);
+						setProfile(connection, id, profile.getProperties());
+						setTables(connection, id, profile.getTables());
+					}
 				}
 			}else
 				logger.warn("Serial Number = NULL");
 		}
-		return logger.exit(serialNumberId);
+		return logger.exit(serialNumber);
+	}
+
+	// true - if unitProfileChangeDate < dbProfileChangeDate+10min
+	private boolean isCorrectDate(Timestamp unitProfileChangeDate, Timestamp dbProfileChangeDate) {
+		return unitProfileChangeDate==null || dbProfileChangeDate==null || dbProfileChangeDate.getTime()<unitProfileChangeDate.getTime()+10*1000;
+	}
+
+	private boolean profilesAreEqual(Connection connection, String profile1, Profile profile2) {
+
+		Profile parseProfile1 = Profile.parseProfile(profile1);
+		boolean result;
+
+		if(parseProfile1!=null){
+			parseProfile1.setCompareByName(false);
+			result = parseProfile1.equals(profile2);
+		}else
+			result =  profile2==null;
+
+		return result;
+	}
+
+	private Timestamp getUploadDate(String profileStr) {
+		final String KEY = ConnectionPanel.UPLOAD_DATE;
+
+		int lastIndexOf = profileStr.lastIndexOf(KEY);
+		if(lastIndexOf>=0)
+			profileStr = profileStr.substring(lastIndexOf+KEY.length());
+		else
+			profileStr = "1978-01-01 00:00:00";
+
+		logger.debug("lastIndexOf={}, Date={}", lastIndexOf, profileStr);
+
+		return Timestamp.valueOf(profileStr);
 	}
 
 	private void notifyObservers(Profile profile) {
@@ -80,36 +128,52 @@ public class Database extends Observable {
 		super.notifyObservers(profile);
 	}
 
-	public Long updateProfile(String oldProfileStr, String newProfileStr) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
+	public SerialNumber updateProfile(final String oldProfileStr, final String newProfileStr) throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException {
 		logger.entry(oldProfileStr, newProfileStr);
-		long serialNumberId = 0;
+						ExecutorService executorService = Executors.newFixedThreadPool(2);
+						Future<Profile> submitOld = executorService.submit(Profile.getCallable(oldProfileStr));
+						Future<Profile> submitNew = executorService.submit(Profile.getCallable(newProfileStr));
+		Profile oldProfile = submitOld.get();
+		Profile newProfile =submitNew.get();
+						executorService.shutdown();
 
+		SerialNumber serialNumber = null;
+
+		if(newProfile!=null)
 		try(Connection connection = MySQLConnector.getConnection()){
 
-			Profile oldProfile = Profile.parseProfile(oldProfileStr);
-			String serialNumberStr = oldProfile.getProperty(ProfileProperties.SERIAL_NUMBER.toString());
+			String serialNumberStr = null;
+			String profileProperty_SERIAL_NUMBER = ProfileProperties.SERIAL_NUMBER.toString();
 
-			Profile newProfile = Profile.parseProfile(newProfileStr);
+			if(oldProfile!=null)
+				serialNumberStr = oldProfile.getProperty(profileProperty_SERIAL_NUMBER);
 
-			notifyObservers(newProfile);
-
+			String newSerialNumberStr = null;
 			if(serialNumberStr==null)
-				serialNumberStr = newProfile.getProperty(ProfileProperties.SERIAL_NUMBER.toString());
-			else if(oldProfile.equals(newProfile)){
-				logger.trace("Profiles are the same. serialNumberStr set to 'null'");
-				serialNumberStr = null;
-			}
+				serialNumberStr = newProfile.getProperty(profileProperty_SERIAL_NUMBER);
+			else
+				newSerialNumberStr = newProfile.getProperty(profileProperty_SERIAL_NUMBER);
 
-			if (serialNumberStr != null && !serialNumberStr.toUpperCase().contains("X")){
-				serialNumberId = getSerialNumberId(connection, serialNumberStr);
-				databaseSerialNumber.setProfile(connection, serialNumberId, newProfileStr);
-				setProfile(connection, (serialNumberId = getSerialNumberId(connection, serialNumberStr)), newProfile);
-				setTables(connection, serialNumberId, newProfile.getTables());
-			
-			}else
-				logger.warn("Serial Number = NULL");
+			if (serialNumberStr != null && !serialNumberStr.replaceAll("\\D", "").isEmpty()){
+
+				if (!serialNumberStr.toUpperCase().contains("X")) {
+
+					serialNumber = getSerialNumber(connection, serialNumberStr, newSerialNumberStr, getUploadDate(oldProfileStr));
+
+					long id = serialNumber.getId();
+
+					if(id>0){
+						databaseSerialNumber.setProfile(connection, id, newProfileStr);
+						setProfile(connection, id, newProfile.getProperties());
+						setTables(connection, id, newProfile.getTables());
+					}
+				}
+				notifyObservers(newProfile);
+			}else{
+				logger.warn("Serial Number is not correct({})", serialNumberStr);
+			}
 		}
-		return logger.exit(serialNumberId);
+		return logger.exit(serialNumber);
 	}
 
 	private void setTables(Connection connection, long serialNumberId, List<Table> tables) {
@@ -117,7 +181,6 @@ public class Database extends Observable {
 
 		for(Table t:tables)
 			try {
-
 				setTable(connection, serialNumberId, t);
 
 			} catch (Exception e) { logger.catching(e); }
@@ -132,45 +195,81 @@ public class Database extends Observable {
 		TreeMap<BigDecimal, BigDecimal> tableMap = table.getTableMap();
 		Set<BigDecimal> keySet = tableMap.keySet();
 
-		for(BigDecimal bd:keySet)
-			try {
+		if(profileVariableId>0){
+			for(BigDecimal bd:keySet)
+				try {
 
-				databaseSerialNumberTable.set(connection, serialNumberId, profileVariableId, bd, tableMap.get(bd));
+					databaseSerialNumberTable.setTableRow(connection, serialNumberId, profileVariableId, bd, tableMap.get(bd));
 
-			} catch (SQLException e) { logger.catching(e); }
-		databaseSerialNumberTable.setActive(connection, serialNumberId, profileVariableId, tableMap);
+				} catch (SQLException e) { logger.catching(e); }
+
+			databaseSerialNumberTable.setNotActive(connection, serialNumberId, profileVariableId, tableMap);
+		}
 
 		logger.exit();
 	}
 
-	private void setProfile(Connection connection, long serialNumberId, Profile profile) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
-		Properties properties = profile.getProperties();
+	private void setProfile(Connection connection, long serialNumberId, Properties properties) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
 		Set<Object> keySet = properties.keySet();
 
 		for(Object o:keySet)
 			try {
-
-				databaseSerialNumberProfile.set(connection, serialNumberId, databaseSerialNumberProfile.getProfileVariableId(connection, (String) o), profile.getProperty((String) o));
-
+				String key = (String) o;
+				databaseSerialNumberProfile.set(connection,
+												serialNumberId,
+												databaseSerialNumberProfile.getProfileVariableId(connection, key),
+												properties.getProperty(key)
+						);
 			} catch (SQLException e) { logger.catching(e); }
 
 		databaseSerialNumberProfile.setActive(connection, serialNumberId, keySet);
 	}
 
-	private long getSerialNumberId(Connection connection, String serialNumberStr) throws SQLException {
-		long serialNumberId;
+	private SerialNumber getSerialNumber(Connection connection, String serialNumberStr) throws SQLException{
+		return getSerialNumber(connection, serialNumberStr, null, null);
+		
+	}
 
-		SerialNumber serialNumber = databaseSerialNumber.get(connection, serialNumberStr);
+	private SerialNumber getSerialNumber(Connection connection, String serialNumberStr, String newSerialNumberStr, Timestamp profileUploadDate) throws SQLException {
+		logger.entry(serialNumberStr, newSerialNumberStr);
 
-		if(serialNumber!=null){
-			serialNumberId = serialNumber.getId();
-			if(!serialNumber.getSerialNumber().equals(serialNumberStr)){
-				serialNumber.setSerialNumber(serialNumberStr);
-				databaseSerialNumber.update(connection, serialNumber);
+		SerialNumber serialNumber = null;
+		if(serialNumberStr!=null){
+			serialNumber = databaseSerialNumber.get(connection, serialNumberStr);
+			if(serialNumber==null)
+				return databaseSerialNumber.add(connection, serialNumberStr);
+		}
+
+		SerialNumber newSerialNumber = null;
+		if(newSerialNumberStr!=null){
+			newSerialNumber = databaseSerialNumber.get(connection, newSerialNumberStr);
+			if(serialNumber==null)
+				if(newSerialNumber==null)
+					return databaseSerialNumber.add(connection, newSerialNumberStr);
+				else
+					return newSerialNumber;
+			else{
+				if(profileUploadDate!=null && serialNumber.getProfileChangeDate().getTime()-10*1000 > profileUploadDate.getTime())//if PCB profile is older then datadase
+					if(newSerialNumber==null)
+						return databaseSerialNumber.add(connection, newSerialNumberStr);
+					else{
+						if(!serialNumber.getSerialNumber().equals(newSerialNumberStr))
+							databaseSerialNumber.update(connection, serialNumber.setSerialNumber(newSerialNumberStr));
+						return newSerialNumber;
+					}
+
+				if (databaseSerialNumber.update(connection, newSerialNumber != null
+						? newSerialNumber
+								: new SerialNumber().setId(serialNumber.getId()).setSerialNumber(newSerialNumberStr))
+					> 0)
+					return newSerialNumber;
 			}
-		}else
-			serialNumberId = databaseSerialNumber.add(connection, serialNumberStr);
-		return serialNumberId;
+		}
+
+		if(!serialNumber.getSerialNumber().equals(serialNumberStr))
+			databaseSerialNumber.update(connection, serialNumber.setSerialNumber(serialNumberStr));
+
+		return serialNumber;
 	}
 
 	public List<ProfileVariable> getAllProfileVariables() throws ClassNotFoundException, SQLException, IOException, InterruptedException {

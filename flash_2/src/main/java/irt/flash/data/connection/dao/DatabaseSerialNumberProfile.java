@@ -41,7 +41,7 @@ public class DatabaseSerialNumberProfile {
 
 	public void set(Connection connection, Long serialNumberId, Long variableId, String value) throws SQLException {
 
-		String sql = sqlProperties.getProperty("active_serial_number_profile_variable");
+		String sql = sqlProperties.getProperty("select_serial_number_profile_variable");
 		logger.entry(serialNumberId, variableId, value, sql);
 
 		List<SerialNumberProfileVariable> snpv = new ArrayList<>();
@@ -52,34 +52,41 @@ public class DatabaseSerialNumberProfile {
 			try(ResultSet resultSet = statement.executeQuery()){
 
 				while(resultSet.next())
-					snpv.add(get(resultSet));						
+					snpv.add(get(resultSet));
 			}
 		}
 
 		logger.trace("{}", snpv);
 
-		boolean equals = false; 
+		boolean haveToAdd = true; 
 		for(SerialNumberProfileVariable v:snpv)
-			if(!(equals=v.getVariableValue().equals(value)))
+			if(v.getVariableValue().equals(value)){
+				if(!v.isStatus())
+					setActive(connection, v.getId(), true);
+				haveToAdd = false;
+			}else
 				setActive(connection, v.getId(), false);
 
-		if(!equals)
-			add(connection, serialNumberId, variableId, value, true);
+		if(haveToAdd)
+			addValue(connection, serialNumberId, variableId, value, true);
 		logger.exit();
 	}
 
-	public void add(Connection connection, Long serialNumberId, Long profileVariableId, String value, boolean active) throws SQLException {
+	public int addValue(Connection connection, Long serialNumberId, Long profileVariableId, String value, boolean active) throws SQLException {
+		logger.entry(serialNumberId, profileVariableId, value);
 
 		String sql = sqlProperties.getProperty("insert_serial_number_profile_variable");
 		logger.trace(sql);
-		
+
+		int executeUpdate = 0;
 		try(PreparedStatement statement = connection.prepareStatement(sql)){
 			statement.setLong(1, serialNumberId);
 			statement.setLong(2, profileVariableId);
 			statement.setString(3, value);
 			statement.setInt(4, active ? 1 : 0);
-			statement.executeUpdate();
+			executeUpdate = statement.executeUpdate();
 		}
+		return logger.exit(executeUpdate);
 	}
 
 	public void setActive(Connection connection, long id, boolean active) throws SQLException {
@@ -149,7 +156,7 @@ public class DatabaseSerialNumberProfile {
 		snpv.setVariableValue(resultSet.getString("value"));
 		snpv.setStatus(resultSet.getBoolean("status"));
 		snpv.setDate(resultSet.getTimestamp("date"));
-		snpv.setStatusChangeDate(resultSet.getTimestamp("status_change_date"));
+		snpv.setStatusChangeDate(resultSet.getTimestamp("last_status_update"));
 		return snpv;
 	}
 

@@ -84,6 +84,8 @@ public class MessageDialog extends JDialog{
 			mainPanel.add(contentPanel, BorderLayout.CENTER);
 			{
 				textArea = new JTextArea();
+				textArea.setFocusable(false);
+				textArea.setFocusTraversalKeysEnabled(false);
 				textArea.setEditable(false);
 				textArea.setFont(new Font("Monospaced", Font.BOLD, 16));
 				contentPanel.add(textArea, BorderLayout.CENTER);
@@ -94,9 +96,13 @@ public class MessageDialog extends JDialog{
 				contentPanel.add(panelProgressBar, BorderLayout.NORTH);
 				
 				progressBar = new JProgressBar();
+				progressBar.setFocusTraversalKeysEnabled(false);
+				progressBar.setFocusable(false);
 				progressBar.setPreferredSize(new Dimension(14, 14));
 				progressBar.setMaximum(10000);
 				lblProgress = new JLabel("");
+				lblProgress.setFocusTraversalKeysEnabled(false);
+				lblProgress.setFocusable(false);
 				lblProgress.setHorizontalAlignment(SwingConstants.CENTER);
 
 				GroupLayout gl_panelProgressBar = new GroupLayout(panelProgressBar);
@@ -146,8 +152,6 @@ public class MessageDialog extends JDialog{
 	//********************************************************************
 	private class DialogWorker extends SwingWorker<Object, Void>{
 
-		private final Logger logger = (Logger) LogManager.getLogger();
-
 		private Object message;
 
 		public DialogWorker(Object message){
@@ -157,18 +161,14 @@ public class MessageDialog extends JDialog{
 
 		@Override
 		protected Object doInBackground() throws Exception {
-			set(message);
-			return null;
-		}
 
-		private synchronized <T> void set(T message) throws InterruptedException {
 			if(message!=null){
 				if(message instanceof Status[]){
-					logger.trace("(Status[])message={}", message);
+					logger.trace("(Status[])message={}", (Object[])message);
 					setMessage((Status[])message);
 				}else if(message instanceof Status){
 					logger.trace("(Status)message={}", message);
-					setMessage((Status)message);
+					new StatusWorker((Status)message).execute();
 				}else if(message instanceof BigDecimal){
 					logger.trace("(BigDecimal)message={}", message);
 					setProgressBar((BigDecimal)message);
@@ -182,6 +182,7 @@ public class MessageDialog extends JDialog{
 				panelProgressBar.setVisible(false);
 				setVisible(false);
 			}
+			return null;
 		}
 
 		private void setMessage(String text) throws InterruptedException {
@@ -196,40 +197,15 @@ public class MessageDialog extends JDialog{
 		}
 
 		private void setMessage(Status[] statuses) throws InterruptedException {
-			logger.entry((Object)statuses);
+			logger.entry((Object[])statuses);
 
 			for (Status s : statuses){
-				if(isCancelled())
+				if(isCancelled()){
+					logger.trace("Break;");
 					break;
-				else
-					setMessage(s);
+				}else
+					new StatusWorker(s).execute();
 			}
-			logger.exit();
-		}
-
-		private void setMessage(Status status) throws InterruptedException {
-			logger.entry(status);
-
-			switch (status) {
-			case BUTTON:
-				button.setText(status.getMessage());
-				break;
-			case ERROR:
-				String message = status.getMessage();
-				logger.trace(message);
-				textArea.setText(message);
-				button.setText("Ok");
-				resize();
-				break;
-			default:
-				message = status.getMessage();
-				if (message != null) {
-					textArea.setText(message);
-					resize();
-				} else if (isVisible())
-					setVisible(false);
-			}
-
 			logger.exit();
 		}
 
@@ -285,6 +261,43 @@ public class MessageDialog extends JDialog{
 							}
 						});
 			logger.exit();
+		}
+
+		private class StatusWorker extends SwingWorker<Void, Void>{
+			Status status;
+
+			public StatusWorker(Status status) {
+				this.status = status;
+			}
+
+			@Override
+			protected Void doInBackground() throws Exception {
+				logger.entry(status);
+
+				String text = status.getMessage();
+				switch (status) {
+				case BUTTON:
+					logger.trace("button.setText({});", text);
+					button.setText(text);
+					break;
+				case ERROR:
+					logger.trace("textArea.setText({})", text);
+					textArea.setText(text);
+					button.setText("Ok");
+					resize();
+					break;
+				default:
+					if (text != null) {
+						logger.trace("textArea.setText({})", text);
+						textArea.setText(text);
+						resize();
+					} else if (isVisible())
+						setVisible(false);
+				}
+
+				logger.exit();
+				return null;
+			}
 		}
 	}
 }

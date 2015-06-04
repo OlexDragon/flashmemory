@@ -13,6 +13,8 @@ import irt.flash.presentation.panel.ConnectionPanel;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
@@ -160,15 +162,18 @@ public class Database extends Observable {
 
 					serialNumber = getSerialNumber(connection, serialNumberStr, newSerialNumberStr, getUploadDate(oldProfileStr));
 
-					long id = serialNumber.getId();
+					if(serialNumber!=null){
+						long id = serialNumber.getId();
 
-					if(id>0){
-						databaseSerialNumber.setProfile(connection, id, newProfileStr);
-						setProfile(connection, id, newProfile.getProperties());
-						setTables(connection, id, newProfile.getTables());
-					}
-				}
+						if(id>0){
+							databaseSerialNumber.setProfile(connection, id, newProfileStr);
+							setProfile(connection, id, newProfile.getProperties());
+							setTables(connection, id, newProfile.getTables());
+						}
+					}else
+						logger.warn("Serial Number is not correct({})", serialNumberStr);
 				notifyObservers(newProfile);
+				}
 			}else{
 				logger.warn("Serial Number is not correct({})", serialNumberStr);
 			}
@@ -330,5 +335,32 @@ public class Database extends Observable {
 
 	public static ProfileVariable getProfileVariavle(String profileVariableStr) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		return getInstance().databaseDeviceTypes.getProfileVariavle(profileVariableStr);
+	}
+
+	public static String getProfileHeader(DeviceType deviceType) throws Exception {
+		return getInstance().getProfileHeader(deviceType.getDeviceType());
+	}
+
+	private String getProfileHeader(int deviceType) throws Exception {
+		logger.entry(deviceType);
+		String result = null;
+
+		String sql = sqlProperties.getProperty("select_profile_header");
+		logger.entry(sql);
+
+		try(Connection connection = MySQLConnector.getConnection()){
+			try(PreparedStatement statement = connection.prepareStatement(sql)){
+				statement.setInt(1, deviceType);
+				try(ResultSet resultSet = statement.executeQuery()){
+					if(resultSet.next()){
+						result = resultSet.getString(1);
+						do{
+							result += resultSet.getString(1);
+						}while(resultSet.next());
+					}
+				}
+			}
+		}
+		return logger.exit(result);
 	}
 }

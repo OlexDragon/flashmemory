@@ -1,5 +1,6 @@
 package irt.flash.presentation.panel;
 
+import irt.flash.data.DeviceType;
 import irt.flash.data.Profile;
 import irt.flash.data.Table;
 import irt.flash.data.UnitType;
@@ -139,6 +140,14 @@ public class EditProfilePanel extends JScrollPane implements Observer {
 		new UnitTypeWorker(unitType).execute();
 	}
 
+	public List<EditPanel<?>> getPanels() {
+		return panels;
+	}
+
+	public List<EditTablePanel> getTablePanels() {
+		return tablePanels;
+	}
+
 	// ********************************************************************************************
 	private class UpdateWorker extends SwingWorker<Observable, Object> {
 
@@ -223,5 +232,9 @@ public class EditProfilePanel extends JScrollPane implements Observer {
 				logger.catching(e);
 			}
 		}
+	}
+
+	public DeviceType getDeviceType() {
+		return deviceTypePanel.getValue();
 	}
 }

@@ -60,6 +60,12 @@ public abstract class EditTextFieldPanel extends EditPanel<String> {
 	}
 
 	@Override
+	public String getValue() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
 	public void setValue(final Object value) {
 		new SwingWorker<Void, Void>() {
 			@Override

@@ -641,7 +641,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		popupMenu.add(mntmCheckProgram_1);
 		
 		try {
-			editProfile = new ProfileWorkerPanel();
+			editProfile = new ProfileWorkerPanel(owner);
 			editProfile.setUnitType((String) comboBoxUnitType.getSelectedItem());
 			databaseController.addObserver((Observer)editProfile);
 		} catch (Exception e1) {
@@ -880,12 +880,12 @@ public class ConnectionPanel extends JPanel implements Observer {
 				}else{
 					setLabel(lblConnection, CAN_NOT_CONNECT, Color.RED);
 					disconnect();
-					dialog.setMessage(Status.ERROR.setMessage("Cen Not Connect.("+(Answer.NACK.getAnswer()==bytes[0] ? Answer.NACK : (ToHex.bytesToHex(bytes)))+")"));
+					dialog.setMessage(Status.ERROR.setMessage("Can Not Connect.("+(Answer.NACK.getAnswer()==bytes[0] ? Answer.NACK : (ToHex.bytesToHex(bytes)))+")"));
 				}
 			}else{
 				setLabel(lblConnection, CAN_NOT_CONNECT, Color.RED);
 				disconnect();
-				dialog.setMessage(Status.ERROR.setMessage("Con Not Connect.(NULL)"));
+				dialog.setMessage(Status.ERROR.setMessage("Can Not Connect.(NULL)"));
 			}
 		}
 

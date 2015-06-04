@@ -99,6 +99,12 @@ public abstract class EditTablePanel extends EditPanel<String> {
 	}
 
 	@Override
+	public String getValue() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
 	public void setValue(Object value) {
 		if(value instanceof Table)
 			tableModel.setTable((Table)value);

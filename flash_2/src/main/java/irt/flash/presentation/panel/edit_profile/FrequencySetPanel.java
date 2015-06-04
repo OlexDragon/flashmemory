@@ -41,6 +41,13 @@ public class FrequencySetPanel extends EditPanel<String> {
 		setLayout(groupLayout);
 	}
 
+	@Override
+	public String getValue() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
 	public void setValue(Object frequencies) {
 		logger.trace(frequencies);
 		if(frequencies!=null){

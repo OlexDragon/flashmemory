@@ -87,4 +87,5 @@ public abstract class EditPanel<T> extends JPanel {
 		return getBackground()!=color;
 	}
 	public abstract void setValue(Object value);
+	public abstract T getValue();
 }

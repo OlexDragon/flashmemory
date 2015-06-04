@@ -163,7 +163,10 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	}
 
 	public enum Answer {
-		UNKNOWN("UNKNOWN", (byte) -1), NULL("NULL", (byte) 0), ACK("ACK", (byte) 0x79), NACK("NACK", (byte) 0x1F);
+		UNKNOWN("UNKNOWN", (byte) -1),
+		NULL("NULL", (byte) 0),
+		ACK("ACK", (byte) 0x79),
+		NACK("NACK", (byte) 0x1F);
 
 		private byte answer;
 		private String name;
@@ -177,9 +180,15 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			return answer;
 		}
 
+		public Answer setAnswer(byte answer){
+			if(this==UNKNOWN)
+				this.answer = answer;
+			return this;
+		}
+
 		@Override
 		public String toString() {
-			return name;
+			return name+"(0x"+ToHex.byteToHex(answer)+ ")";
 		}
 	}
 
@@ -250,7 +259,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
 	private volatile Command command;
 	private int waitingByteCount;
-	private int waitTime = 500;
+	private int waitTime = 1000;
 	private volatile Answer lastAnswer;
 
 	private MicrocontrollerSTM32() {
@@ -284,7 +293,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
 		notifyObservers(new Status[] { Status.WRITING.setMessage("Erasing The Flash Memory."), Status.BUTTON.setMessage("Stop") });
 		if (eraseFlash()) {
-			notifyObservers(Status.WRITING.setMessage("Wtiting to The Flash Memory."));
+			notifyObservers(Status.WRITING.setMessage("Writing to The Flash Memory."));
 
 			boolean error = false;
 			while (true) {
@@ -469,15 +478,16 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		byte[] readBytes = serialPort.readBytes(1, waitTime);
 
 		if (readBytes == null)
-			lastAnswer = logger.exit(Answer.NULL);
+			lastAnswer = Answer.NULL;
 		else if (readBytes[0] == Answer.ACK.getAnswer())
-			lastAnswer = logger.exit(Answer.ACK);
+			lastAnswer = Answer.ACK;
 		else if (readBytes[0] == Answer.NACK.getAnswer())
-			lastAnswer = logger.exit(Answer.NACK);
+			lastAnswer = Answer.NACK;
 		else
-			lastAnswer = logger.exit(Answer.UNKNOWN);
+			lastAnswer =  Answer.UNKNOWN.setAnswer(readBytes[0]);
 
-		return lastAnswer == Answer.ACK;
+		logger.trace("Answer.{}", lastAnswer);
+		return logger.exit(lastAnswer == Answer.ACK);
 	}
 
 	private byte[] addCheckSum(byte[] original) {

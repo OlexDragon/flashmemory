@@ -69,10 +69,11 @@ public class FlashSerialPort extends SerialPort {
 		return readBytes;
 		
 	}
+
 	@Override
 	public byte[] readBytes(int byteCount) throws SerialPortException {
 
-		return readBytes(byteCount, 50);
+		return readBytes(byteCount, 100);
 	}
 
 	public synchronized byte[] readBytes(int byteCount, int waitTime) throws SerialPortException {

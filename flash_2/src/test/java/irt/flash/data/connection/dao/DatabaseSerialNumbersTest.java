@@ -11,12 +11,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.Logger;
 import org.junit.Before;
 import org.junit.Test;
 
 public class DatabaseSerialNumbersTest {
 
-	private DatabaseSerialNumbers databaseSerialNumbers;
+
+    private Logger logger = (Logger) LogManager.getLogger();
+
+    private DatabaseSerialNumbers databaseSerialNumbers;
 
 	@Before
 	public void init() throws IOException{
@@ -60,7 +65,9 @@ public class DatabaseSerialNumbersTest {
 
 	@Test
 	public void getSerialNumbersStartWith() throws ClassNotFoundException, SQLException, IOException, InterruptedException {
-		assertEquals("IRT-1343002", databaseSerialNumbers.getNextSerialNumber("1343"));
-		assertEquals("IRT-1351001", databaseSerialNumbers.getNextSerialNumber("1351"));
+		String nextSerialNumber = databaseSerialNumbers.getNextSerialNumber("1343");
+		logger.trace(nextSerialNumber);
+		assertEquals("IRT-1343001", nextSerialNumber);
+		assertEquals("IRT-1351004", databaseSerialNumbers.getNextSerialNumber("1351"));
 	}
 }

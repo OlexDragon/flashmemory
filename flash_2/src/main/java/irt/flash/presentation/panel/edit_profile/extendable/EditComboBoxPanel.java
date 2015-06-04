@@ -36,6 +36,12 @@ public abstract class EditComboBoxPanel<T> extends EditPanel<T> {
 		setLayout(groupLayout);
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
+	public T getValue(){
+		return (T) comboBox.getSelectedItem();
+	}
+
 	@Override
 	public void setValue(final Object value) {
 		logger.debug(value);

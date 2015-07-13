@@ -33,6 +33,7 @@ public class DatabaseSerialNumbers {
 		String sql = sqlProperties.getProperty("select_serial_number");
 
 		try(Connection connection = MySQLConnector.getConnection()){
+			if(connection!=null)
 			try(PreparedStatement statement = connection.prepareStatement(sql)){
 				statement.setString(1, serialNumber);
 				try(ResultSet resultSet = statement.executeQuery()){
@@ -113,6 +114,7 @@ public class DatabaseSerialNumbers {
 		logger.trace(sql);
 
 		try(Connection connection = MySQLConnector.getConnection()){
+			if(connection!=null)
 			try (PreparedStatement statement = connection.prepareStatement(sql)) {
 
 				statement.setString(1, like);

@@ -64,6 +64,7 @@ public class Database extends Observable {
 
 		try(Connection connection = MySQLConnector.getConnection()){
 
+			if(connection!=null){
 			Profile profile = Profile.parseProfile(profileStr);
 
 			notifyObservers(profile);
@@ -88,6 +89,7 @@ public class Database extends Observable {
 				}
 			}else
 				logger.warn("Serial Number = NULL");
+			}
 		}
 		return logger.exit(serialNumber);
 	}
@@ -144,6 +146,7 @@ public class Database extends Observable {
 		if(newProfile!=null)
 		try(Connection connection = MySQLConnector.getConnection()){
 
+			if(connection!=null){
 			String serialNumberStr = null;
 			String profileProperty_SERIAL_NUMBER = ProfileProperties.SERIAL_NUMBER.toString();
 
@@ -176,6 +179,7 @@ public class Database extends Observable {
 				}
 			}else{
 				logger.warn("Serial Number is not correct({})", serialNumberStr);
+			}
 			}
 		}
 		return logger.exit(serialNumber);
@@ -349,6 +353,7 @@ public class Database extends Observable {
 		logger.entry(sql);
 
 		try(Connection connection = MySQLConnector.getConnection()){
+			if(connection!=null){
 			try(PreparedStatement statement = connection.prepareStatement(sql)){
 				statement.setInt(1, deviceType);
 				try(ResultSet resultSet = statement.executeQuery()){
@@ -359,6 +364,7 @@ public class Database extends Observable {
 						}while(resultSet.next());
 					}
 				}
+			}
 			}
 		}
 		return logger.exit(result);

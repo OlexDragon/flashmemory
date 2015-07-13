@@ -47,6 +47,16 @@ public class FlashApp extends JFrame {
 	 */
 	public FlashApp() {
 		logger.info("*** Application Starts ***");
+
+		Runtime.getRuntime().addShutdownHook(new Thread()
+		{
+		    @Override
+		    public void run()
+		    {
+		        logger.info("ShutdownHook");
+		    }
+		});
+
 		addWindowListener(new WindowAdapter() {
 			@Override
 			public void windowClosing(WindowEvent arg0) {

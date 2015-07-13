@@ -32,9 +32,11 @@ public class DatabaseSerialNumberProfile {
 	public void set(long serialNumberId, String variableName, String value) throws ClassNotFoundException, SQLException, IOException, InterruptedException {
 		if(serialNumberId>0 && variableName!=null && !variableName.isEmpty() && value!=null && !value.isEmpty()){
 			try(Connection connection = MySQLConnector.getConnection()){
+				if(connection!=null){
 				long variableId = getProfileVariableId(connection, variableName);
 				if(variableId>0)
 					set(connection, serialNumberId, variableId, value);
+				}
 			}
 		}
 	}
@@ -221,6 +223,7 @@ public class DatabaseSerialNumberProfile {
 
 		List<ProfileVariable> profileVariables = null;
 		try (Connection connection = MySQLConnector.getConnection()) {
+			if(connection!=null)
 			try (PreparedStatement statement = connection.prepareStatement(sql)) {
 				try(ResultSet resultSet = statement.executeQuery()){
 					if(resultSet.next()){
@@ -245,6 +248,7 @@ public class DatabaseSerialNumberProfile {
 
 		String macAddress;
 		try (Connection connection = MySQLConnector.getConnection()) {
+			if(connection!=null)
 			try (PreparedStatement statement = connection.prepareStatement(sql)) {
 				try(ResultSet resultSet = statement.executeQuery()){
 					List<Integer> macAddresses = new ArrayList<>();
@@ -273,6 +277,8 @@ public class DatabaseSerialNumberProfile {
 					macAddress += ToHex.byteToHex((byte)tmp);
 				}
 			}
+			else
+				macAddress = null;
 		}
 		return logger.exit(macAddress);
 	}
@@ -306,6 +312,7 @@ public class DatabaseSerialNumberProfile {
 			logger.entry(deviceType, deviceSubtype, profileVariableId, sql);
 
 			try (Connection connection = MySQLConnector.getConnection()) {
+				if(connection!=null)
 				try (PreparedStatement statement = connection.prepareStatement(sql)) {
 					statement.setInt(1, deviceType);
 					statement.setInt(2, deviceSubtype);
@@ -331,6 +338,7 @@ public class DatabaseSerialNumberProfile {
 		logger.entry(profileVariableIdToGet, valueProfileVariableId, value, sql);
 
 		try(Connection connection = MySQLConnector.getConnection()){
+			if(connection!=null)
 			try(PreparedStatement statement = connection.prepareStatement(sql)){
 				statement.setInt(1, profileVariableIdToGet);
 				statement.setInt(2, valueProfileVariableId);

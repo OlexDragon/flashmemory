@@ -1,8 +1,9 @@
 package irt.flash.data.connection.dao;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.util.Properties;
 
 import org.apache.logging.log4j.LogManager;
@@ -14,13 +15,34 @@ public class MySQLConnector{
 
 	private static Properties sqlProperties;
 	private static Class<?> classForName;
+	private static boolean isIrtTechnologies;
 
-	public static Connection getConnection() throws SQLException, InterruptedException{
-		logger.trace("Connecting to the Databace");
-		if(classForName==null){
-			setClassForName();
+	//Check if http://irttechnologies exists
+	static{
+		try {
+
+			InetAddress.getByName("irttechnologies");
+			isIrtTechnologies = true;
+
+		} catch (UnknownHostException e) {
+			logger.catching(e);
 		}
-		return DriverManager.getConnection(sqlProperties.getProperty("url"), sqlProperties.getProperty("user"), sqlProperties.getProperty("password"));
+	}
+
+	public static Connection getConnection(){
+		logger.trace("Connecting to the Databace");
+		try {
+
+			if(classForName==null){
+				setClassForName();
+			}
+			return isIrtTechnologies ? DriverManager.getConnection(sqlProperties.getProperty("url"), sqlProperties.getProperty("user"), sqlProperties.getProperty("password")) : null;
+
+		} catch (Exception e) {
+
+			logger.catching(e);
+			return null;
+		}
 	}
 
 	private static void setClassForName() throws InterruptedException {

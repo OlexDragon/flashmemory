@@ -44,6 +44,7 @@ public class DeviceSubtypePanel extends EditComboBoxPanel<DeviceType> {
 	@Override
 	protected void setComboBoxModel() throws Exception {
 		List<DeviceType> deviceTypes =  Database.getDeviceSubtypes();
+		if(deviceTypes!=null){
 		DefaultComboBoxModel<DeviceType> model = new DefaultComboBoxModel<>(deviceTypes.toArray(new DeviceType[deviceTypes.size()]));
 		comboBox.setModel(model);
 		comboBox.addItemListener(new ItemListener() {
@@ -52,5 +53,6 @@ public class DeviceSubtypePanel extends EditComboBoxPanel<DeviceType> {
 					informer.setValue(comboBox.getSelectedItem());
 			}
 		});
+		}
 	}
 }

@@ -35,6 +35,7 @@ public class DatabaseDeviceTypes {
 		logger.entry(unitType, sql);
 
 		try(Connection connection = MySQLConnector.getConnection()){
+			if(connection!=null)
 			try(PreparedStatement statement = connection.prepareStatement(sql)){
 				statement.setString(1, unitType);
 				try(ResultSet resultSet = statement.executeQuery()){
@@ -57,6 +58,7 @@ public class DatabaseDeviceTypes {
 		logger.entry(sql);
 
 		try(Connection connection = MySQLConnector.getConnection()){
+			if(connection!=null)
 			try(PreparedStatement statement = connection.prepareStatement(sql)){
 				try(ResultSet resultSet = statement.executeQuery()){
 					if(resultSet.next()){
@@ -78,6 +80,7 @@ public class DatabaseDeviceTypes {
 		logger.entry(sql);
 
 		try(Connection connection = MySQLConnector.getConnection()){
+			if(connection!=null)
 			try(PreparedStatement statement = connection.prepareStatement(sql)){
 				statement.setLong(1, profileVariableId);
 				try(ResultSet resultSet = statement.executeQuery()){
@@ -100,6 +103,7 @@ public class DatabaseDeviceTypes {
 		logger.entry(sql);
 
 		try(Connection connection = MySQLConnector.getConnection()){
+			if(connection!=null)
 			try(PreparedStatement statement = connection.prepareStatement(sql)){
 				statement.setString(1, unitTypeStr);
 				try(ResultSet resultSet = statement.executeQuery()){
@@ -118,6 +122,7 @@ public class DatabaseDeviceTypes {
 		logger.entry(sql);
 
 		try(Connection connection = MySQLConnector.getConnection()){
+			if(connection!=null)
 			try(PreparedStatement statement = connection.prepareStatement(sql)){
 				statement.setString(1, profileVariableStr);
 				try(ResultSet resultSet = statement.executeQuery()){

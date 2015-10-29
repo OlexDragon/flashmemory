@@ -19,6 +19,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	private static final Logger logger = (Logger) LogManager.getLogger();
 
 	public static final String BIAS_BOARD = "Bias Board";
+	public static final String HP_BIAS_BOARD = "HP Bias Board";
 
 	public enum ProfileProperties {
 		/**
@@ -138,7 +139,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	}
 
 	public enum Address {
-		PROGRAM("PROGRAM", 0x08000000), CONVERTER("CONVERTER", 0x080C0000), BIAS(BIAS_BOARD, 0x080E0000);
+		PROGRAM("PROGRAM", 0x08000000), CONVERTER("CONVERTER", 0x080C0000), BIAS(BIAS_BOARD, 0x080E0000), HP_BIAS(HP_BIAS_BOARD, 0x081E0000);
 
 		private String name;
 		private int addr;
@@ -566,14 +567,17 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
 	private static Address getAddress(String unitType) {
 		logger.entry(unitType);
-		Address address;
-		switch (unitType) {
-		case MicrocontrollerSTM32.BIAS_BOARD:
-			address = Address.BIAS;
-			break;
-		default:
+
+		Address address = null;
+		for(Address a:Address.values())
+			if(a.toString().equals(unitType)){
+				address = a;
+				break;
+			}
+
+		if(address==null)
 			address = Address.CONVERTER;
-		}
+
 		return logger.exit(address);
 	}
 

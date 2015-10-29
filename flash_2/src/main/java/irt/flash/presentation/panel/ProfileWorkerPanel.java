@@ -1,10 +1,5 @@
 package irt.flash.presentation.panel;
 
-import irt.flash.data.connection.dao.Database;
-import irt.flash.presentation.panel.edit_profile.extendable.EditPanel;
-import irt.flash.presentation.panel.edit_profile.extendable.EditTablePanel;
-import irt.flash.presentation.withard.ProfileWithard;
-
 import java.awt.BorderLayout;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
@@ -19,6 +14,11 @@ import javax.swing.SwingWorker;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
+
+import irt.flash.data.connection.dao.Database;
+import irt.flash.presentation.panel.edit_profile.extendable.EditPanel;
+import irt.flash.presentation.panel.edit_profile.extendable.EditTablePanel;
+import irt.flash.presentation.withard.ProfileWithard;
 
 public class ProfileWorkerPanel extends JPanel implements Observer {
 	private static final long serialVersionUID = 863089977016844508L;

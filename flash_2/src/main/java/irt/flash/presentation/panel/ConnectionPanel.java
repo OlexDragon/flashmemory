@@ -191,16 +191,20 @@ public class ConnectionPanel extends JPanel implements Observer {
 				new SwingWorker<Void, Void>(){
 					@Override
 					protected Void doInBackground() throws Exception {
-						comboBoxUnitType.setSelectedItem(Address.CONVERTER.toString());
+
+						String text = Address.CONVERTER.toString();
+
+						comboBoxUnitType.setSelectedItem(text);
+
 						try {
-							FlashConnector.write( (String) comboBoxComPort.getSelectedItem(),
-									new byte[]{0x7E, (byte) 0xFE, 0x00, 0x00, 0x00, 0x03, 0x00, 0x78, 0x64, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x5A, 0x51, 0x7E}
-							);
+
+							FlashConnector.write( text, new byte[]{0x7E, (byte) 0xFE, 0x00, 0x00, 0x00, 0x03, 0x00, 0x78, 0x64, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x5A, 0x51, 0x7E} );
 							dialog.setMessage("Wait please.");
 							synchronized (this) {
 								wait(2000);
 							}
 							new ConnectionWorker().execute();
+
 						} catch (Exception e) {
 							logger.catching(e);
 							JOptionPane.showMessageDialog(null, e.getLocalizedMessage());
@@ -770,6 +774,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		}
 	}
 
+	//*******************************************   ConnectionWorker   *************************************************************
 	private class ConnectionWorker extends SwingWorker<Void, Void>{
 
 		@Override
@@ -803,12 +808,15 @@ public class ConnectionPanel extends JPanel implements Observer {
 		}
 	}
 
+	//*******************************************   ReaderWorker   *************************************************************
 	private class ReaderWorker extends SwingWorker<Void, Void>{
 
 		@Override
 		protected Void doInBackground() throws Exception {
 			try {
+
 				MicrocontrollerSTM32.read((String) comboBoxUnitType.getSelectedItem());
+
 			} catch (InterruptedException e) {
 				logger.catching(e);
 			}
@@ -962,7 +970,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 	private void setReadButton() {
 		boolean connected = FlashConnector.isConnected();
-		if(comboBoxUnitType.getSelectedItem().equals(Address.BIAS.toString()) && !connected)
+		if(!comboBoxUnitType.getSelectedItem().equals(Address.CONVERTER.toString()) && !connected)
 			setEnableReadButton(FCM_UPGRADE, FCM_UPGRADE, true);
 		else
 			setEnableReadButton("Read", "Read Profile", comboBoxUnitType.getSelectedIndex()>0 && connected);

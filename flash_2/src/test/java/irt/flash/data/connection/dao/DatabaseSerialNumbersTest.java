@@ -3,6 +3,7 @@ package irt.flash.data.connection.dao;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
@@ -26,8 +27,10 @@ public class DatabaseSerialNumbersTest {
 	@Before
 	public void init() throws IOException{
 		Properties p = new Properties();
-		p.load(Database.class.getResourceAsStream("sql.properties"));
-		databaseSerialNumbers = new DatabaseSerialNumbers(p);
+		try (InputStream resourceAsStream = Database.class.getResourceAsStream("sql.properties");) {
+			p.load(resourceAsStream);
+			databaseSerialNumbers = new DatabaseSerialNumbers(p);
+		}
 	}
 
 	@Test

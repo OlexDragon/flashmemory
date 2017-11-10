@@ -11,6 +11,7 @@ import irt.flash.data.connection.MicrocontrollerSTM32.ProfileProperties;
 import irt.flash.presentation.panel.ConnectionPanel;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -50,12 +51,16 @@ public class Database extends Observable {
 
 	private Database() throws IOException{
 		logger.info("* Start *");
-		defaultProperties.load(getClass().getResourceAsStream("default.properties"));
-		sqlProperties.load(getClass().getResourceAsStream("sql.properties"));
-		databaseSerialNumber = new DatabaseSerialNumbers(sqlProperties);
-		databaseSerialNumberProfile = new DatabaseSerialNumberProfile(sqlProperties);
-		databaseSerialNumberTable = new DatabaseSerialNumberTable(sqlProperties);
-		databaseDeviceTypes = new DatabaseDeviceTypes(sqlProperties);
+		try(InputStream resourceAsStream = getClass().getResourceAsStream("default.properties");){
+			defaultProperties.load(resourceAsStream);
+		}
+		try (InputStream resourceAsStream = getClass().getResourceAsStream("sql.properties");) {
+			sqlProperties.load(resourceAsStream);
+			databaseSerialNumber = new DatabaseSerialNumbers(sqlProperties);
+			databaseSerialNumberProfile = new DatabaseSerialNumberProfile(sqlProperties);
+			databaseSerialNumberTable = new DatabaseSerialNumberTable(sqlProperties);
+			databaseDeviceTypes = new DatabaseDeviceTypes(sqlProperties);
+		}
 	}
 
 	public SerialNumber setProfile(String profileStr) throws ClassNotFoundException, SQLException, IOException, InterruptedException{

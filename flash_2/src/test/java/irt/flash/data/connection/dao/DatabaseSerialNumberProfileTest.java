@@ -3,6 +3,7 @@ package irt.flash.data.connection.dao;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Properties;
 
@@ -16,8 +17,10 @@ public class DatabaseSerialNumberProfileTest {
 	@Before
 	public void setUp() throws Exception {
 		Properties p = new Properties();
-		p.load(Database.class.getResourceAsStream("sql.properties"));
-		databaseSerialNumberProfile = new DatabaseSerialNumberProfile(p);
+		try( InputStream resourceAsStream = Database.class.getResourceAsStream("sql.properties");){
+			p.load(resourceAsStream);
+			databaseSerialNumberProfile = new DatabaseSerialNumberProfile(p);
+		}
 	}
 
 	@Test

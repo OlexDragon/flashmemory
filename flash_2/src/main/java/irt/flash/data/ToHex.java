@@ -9,7 +9,7 @@ public class ToHex {
 
 	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
 
-	public static String bytesToHex(byte[] bytes) {
+	public static String bytesToHex(byte... bytes) {
 		logger.entry((Object)bytes);
 		String string = null;
 
@@ -22,7 +22,7 @@ public class ToHex {
 				hexChars[j * 3 + 1] = hexArray[v & 0x0F];
 				hexChars[j * 3 + 2] = ' ';
 			}
-			string = new String(hexChars);
+			string = new String(hexChars).trim();
 		}
 
 		return string;
@@ -40,14 +40,5 @@ public class ToHex {
 		}
 
 		return logger.exit(result);
-	}
-
-	public static String byteToHex(byte toHex) {
-		logger.entry(toHex);
-		char[] ch = new char[2];
-		int v = toHex & 0xFF;
-		ch[0] = hexArray[v >>> 4];
-		ch[1] = hexArray[v & 0x0F];
-		return logger.exit(new String(ch));
 	}
 }

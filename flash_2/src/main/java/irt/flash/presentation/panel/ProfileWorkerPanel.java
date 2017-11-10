@@ -4,7 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.List;
 import java.util.Observable;
 import java.util.Observer;
 
@@ -17,7 +16,6 @@ import org.apache.logging.log4j.core.Logger;
 
 import irt.flash.data.connection.dao.Database;
 import irt.flash.presentation.panel.edit_profile.extendable.EditPanel;
-import irt.flash.presentation.panel.edit_profile.extendable.EditTablePanel;
 import irt.flash.presentation.withard.ProfileWithard;
 
 public class ProfileWorkerPanel extends JPanel implements Observer {
@@ -54,7 +52,7 @@ public class ProfileWorkerPanel extends JPanel implements Observer {
 									profileStr += ep.getProfileProperties()+" "+value+"\n";
 							}
 							logger.error(profileStr);
-							List<EditTablePanel> tablePanels = editProfilePanel.getTablePanels();
+//							List<EditTablePanel> tablePanels = editProfilePanel.getTablePanels();
 						}
 						return null;
 					}

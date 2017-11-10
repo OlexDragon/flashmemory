@@ -1,15 +1,13 @@
 package irt.flash.data.connection;
 
-import java.util.Arrays;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.Logger;
 
+import irt.flash.data.ToHex;
 import irt.flash.data.connection.MicrocontrollerSTM32.Command;
 import jssc.SerialPort;
 import jssc.SerialPortEventListener;
 import jssc.SerialPortException;
-
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
 
 public class FlashSerialPort extends SerialPort {
 
@@ -17,7 +15,6 @@ public class FlashSerialPort extends SerialPort {
 
 	public FlashSerialPort(String portName) {
 		super(portName);
-		logger.info("* Start *");
 	}
 
 	public synchronized boolean wait(int eventValue, int waitTime) throws SerialPortException {
@@ -42,8 +39,6 @@ public class FlashSerialPort extends SerialPort {
 
 		boolean isOpened = isOpened();
 
-		logger.entry("is Opened", isOpened);
-
 		if (!isOpened) {
 			isOpened = super.openPort();
 			if (isOpened){
@@ -51,28 +46,25 @@ public class FlashSerialPort extends SerialPort {
 				addEventListener(new SerialPortEvent());
 			}
 		}
-		return logger.exit(isOpened);
+		return isOpened;
 	}
 
 	public synchronized boolean writeBytes(Command command) throws SerialPortException {
-		logger.entry(command);
 		clear();
-		return logger.exit(writeBytes(command.toBytes()));
+//		logger.error("{}: {}", command, ToHex.bytesToHex(command.toBytes()));
+		return writeBytes(command.toBytes());
 	}
 
 	@Override
 	public byte[] readBytes() throws SerialPortException {
 		byte[] readBytes = super.readBytes();
-		Level level = logger.getLevel();
-		if(level==Level.ALL || level==Level.TRACE)
-			logger.trace(Arrays.toString(readBytes));
+//		logger.error("{}", ToHex.bytesToHex(readBytes));
 		return readBytes;
 		
 	}
 
 	@Override
 	public byte[] readBytes(int byteCount) throws SerialPortException {
-
 		return readBytes(byteCount, 100);
 	}
 
@@ -83,25 +75,22 @@ public class FlashSerialPort extends SerialPort {
 
 		if (wait(byteCount, waitTime) && isOpened())
 			readBytes = super.readBytes(byteCount);
-		Level level = logger.getLevel();
 
-		if(level==Level.ALL || level==Level.TRACE)
-			logger.trace("read: {}", Arrays.toString(readBytes));
-
-		return logger.exit(readBytes);
+//		logger.error("{}", ToHex.bytesToHex(readBytes));
+		return readBytes;
 	}
 
 	public byte[] clear() throws SerialPortException {
-		logger.entry();
+
 		int waitTime = 20;
 		byte[] readBytes = null;
 		while(wait(1, waitTime)){
 			readBytes = super.readBytes(getInputBufferBytesCount());
-			logger.trace("Clear={}", readBytes);
+			logger.error("Clear={}", ToHex.bytesToHex(readBytes));
 			if(waitTime!=100)
 				waitTime = 100;
 		}
-		logger.exit();
+
 		return readBytes;
 	}
 
@@ -109,7 +98,6 @@ public class FlashSerialPort extends SerialPort {
 	public synchronized boolean closePort() throws SerialPortException {
 
 		boolean isOpened = isOpened();
-		logger.entry("isOpened", isOpened);
 		boolean isClosed = false;
 
 		if (isOpened) {

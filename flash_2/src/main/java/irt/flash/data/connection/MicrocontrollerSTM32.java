@@ -16,6 +16,8 @@ import org.apache.logging.log4j.core.Logger;
 
 public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
+	public static final int KB = 1024;
+
 	private static final Logger logger = (Logger) LogManager.getLogger();
 
 	public static final String BIAS_BOARD = "Bias Board";
@@ -139,7 +141,10 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	}
 
 	public enum Address {
-		PROGRAM("PROGRAM", 0x08000000), CONVERTER("CONVERTER", 0x080C0000), BIAS(BIAS_BOARD, 0x080E0000), HP_BIAS(HP_BIAS_BOARD, 0x081E0000);
+		PROGRAM("PROGRAM", 0x08000000),
+		CONVERTER("CONVERTER", 0x080C0000),
+		BIAS(BIAS_BOARD, 0x080E0000),
+		HP_BIAS(HP_BIAS_BOARD, 0x081E0000);
 
 		private String name;
 		private int addr;
@@ -189,7 +194,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
 		@Override
 		public String toString() {
-			return name+"(0x"+ToHex.byteToHex(answer)+ ")";
+			return name+"(0x"+ToHex.bytesToHex(answer)+ ")";
 		}
 	}
 
@@ -330,7 +335,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			if (!error)
 				notifyObservers((Object) null);
 		} else {
-			notifyObservers(new Status[] { Status.ERROR.setMessage("ERROR.(Command.Esasing The Flash Memory.)"), Status.BUTTON.setMessage("Ok") });
+			notifyObservers(new Status[] { Status.ERROR.setMessage("ERROR.(Command.Erasing The Flash Memory.)"), Status.BUTTON.setMessage("Ok") });
 		}
 
 		return logger.exit(readFrom >= buffer.length);
@@ -339,7 +344,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	private boolean eraseFlash() throws SerialPortException {
 		logger.entry(waitTime);
 		int tmp = waitTime;
-		waitTime = 10000;
+		waitTime = 15000;
 
 		byte[] pagesToErase;
 		if (address == Address.PROGRAM)
@@ -348,6 +353,8 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			pagesToErase = new byte[] { 0, 10 };
 		else
 			pagesToErase = new byte[] { 0, 11 };
+
+		logger.debug("pagesToErase: {}", pagesToErase);
 
 		boolean isDon = sendCommand(Command.EXTENDED_ERASE) && sendCommand(Command.USER_COMMAND.setUserCommand("Pages To Erase", addCheckSum(addLength(pagesToErase))));
 
@@ -364,7 +371,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	}
 
 	private byte[] getProgramPages() {
-		int[] allPages = new int[] { 16 * 1024, 16 * 1024, 16 * 1024, 16 * 1024, 64 * 1024, 128 * 1024, 128 * 1024, 128 * 1024, 128 * 1024, 128 * 1024 };
+		int[] allPages = new int[] { 16 * KB, 16 * KB, 16 * KB, 16 * KB, 64 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB };
 		byte[] pagesToErase = null;
 		if (buffer != null) {
 			addEnd();
@@ -429,7 +436,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
 			notifyObservers(new Status[] { Status.READING.setMessage("Reading"), Status.BUTTON.setMessage("Stop") });
 			// 4 loops equals 1K Bytes
-			for (int i = 0; i < ((1024 * 128) / MAX_VAR_RAM_SIZE); i++) {// max
+			for (int i = 0; i < ((MicrocontrollerSTM32.KB * 128) / MAX_VAR_RAM_SIZE); i++) {// max
 																			// 128K
 																			// bite
 			// "read Command");
@@ -469,7 +476,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	}
 
 	private boolean sendCommand(Command command) throws SerialPortException {
-		logger.entry(command, waitTime);
+		logger.entry(command);
 
 		Level level = logger.getLevel();
 		if(level==Level.ALL || level==Level.TRACE)
@@ -578,7 +585,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		if(address==null)
 			address = Address.CONVERTER;
 
-		return logger.exit(address);
+		return address;
 	}
 
 	public static void writeProfile(String selectedItem, String fileContents) throws InterruptedException {

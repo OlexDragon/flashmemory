@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 import irt.flash.data.connection.MicrocontrollerSTM32.Address;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Properties;
@@ -23,8 +24,10 @@ public class DatabaseDeviceTypesTest {
     @Before
     public void setUp() throws Exception {
         Properties p = new Properties();
-        p.load(Database.class.getResourceAsStream("sql.properties"));
-        databaseDeviceTypes = new DatabaseDeviceTypes(p);
+		try (InputStream resourceAsStream = Database.class.getResourceAsStream("sql.properties");) {
+			p.load(resourceAsStream);
+			databaseDeviceTypes = new DatabaseDeviceTypes(p);
+		}
     }
 
     @Test

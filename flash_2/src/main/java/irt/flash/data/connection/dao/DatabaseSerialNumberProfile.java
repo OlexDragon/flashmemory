@@ -274,7 +274,7 @@ public class DatabaseSerialNumberProfile {
 							tmp = macAddresses.get(255);
 					}
 					macAddress = (String) Database.getDefaultProperties().getProperty("mac_address");
-					macAddress += ToHex.byteToHex((byte)tmp);
+					macAddress += ToHex.bytesToHex((byte)tmp);
 				}
 			}
 			else

@@ -16,10 +16,10 @@ public class ToHexTest {
 
 	@Test
 	public void testByteToHex(){
-		assertEquals("00", ToHex.byteToHex((byte) 0));
-		assertEquals("05", ToHex.byteToHex((byte) 5));
-		assertEquals("0A", ToHex.byteToHex((byte) 10));
-		assertEquals("14", ToHex.byteToHex((byte) 20));
-		assertEquals("FF", ToHex.byteToHex((byte) 255));
+		assertEquals("00", ToHex.bytesToHex((byte) 0));
+		assertEquals("05", ToHex.bytesToHex((byte) 5));
+		assertEquals("0A", ToHex.bytesToHex((byte) 10));
+		assertEquals("14", ToHex.bytesToHex((byte) 20));
+		assertEquals("FF", ToHex.bytesToHex((byte) 255));
 	}
 }

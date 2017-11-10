@@ -1,5 +1,6 @@
 package irt.flash.data.connection.dao;
 
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.sql.Connection;
@@ -52,8 +53,9 @@ public class MySQLConnector{
 			public void run() {
 				logger.entry();
 				sqlProperties = new Properties();
-				try {
-					sqlProperties.load(MySQLConnector.class.getResourceAsStream("MySQLConnector.properties"));
+				try(InputStream resourceAsStream = MySQLConnector.class.getResourceAsStream("MySQLConnector.properties");) {
+					
+					sqlProperties.load(resourceAsStream);
 					classForName = Class.forName("com.mysql.jdbc.Driver");
 				} catch (Exception e) {
 					logger.catching(e);

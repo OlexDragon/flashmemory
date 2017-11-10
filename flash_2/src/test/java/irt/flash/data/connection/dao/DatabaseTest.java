@@ -25,8 +25,8 @@ public class DatabaseTest {
 	@Test
 	public void getPartNumbersTest() throws ClassNotFoundException, SQLException, IOException, InterruptedException{
 		List<String> partNumbers = Database.getPartNumbers("'100W AntBUC Ku-Band Extended'");
-		assertEquals(2, partNumbers.size());
-		assertEquals("TPB-KXB0500-HMS0", partNumbers.get(0));
+		assertEquals(5, partNumbers.size());
+		assertEquals("TPB-KXB0500-HMS12", partNumbers.get(0));
 	}
 
 	@Test
@@ -48,7 +48,7 @@ public class DatabaseTest {
 		assertEquals(2, systemName.size());
 		systemName = Database.getSystemNameByPartNumber("TPB-CB00430-HMA0");
 		assertEquals(1, systemName.size());
-		systemName = Database.getSystemNameByPartNumber("TPB-KXB0460-HMS1");
+		systemName = Database.getSystemNameByPartNumber("TPB-KXB0460-HMS9");
 		assertNull(systemName);
 	}
 

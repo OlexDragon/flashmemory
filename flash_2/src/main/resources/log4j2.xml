@@ -19,7 +19,7 @@
     <Loggers>
         <logger name="irt.flash.presentation.dialog.MessageDialog" level="error" />
 
-        <logger name="irt.flash.presentation.panel.ConnectionPanel" level="error" />
+<!--         <logger name="irt.flash.presentation.panel.ConnectionPanel" level="all" /> -->
         <logger name="irt.flash.presentation.panel.EditProfilePanel" level="error" />
         <logger name="irt.flash.presentation.panel.ProfileWorkerPanel" level="error" />
 

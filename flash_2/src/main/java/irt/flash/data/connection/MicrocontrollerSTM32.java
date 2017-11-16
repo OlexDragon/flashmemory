@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Observable;
 
+import jssc.SerialPort;
 import jssc.SerialPortException;
 
 import org.apache.logging.log4j.Level;
@@ -45,7 +46,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		DEVICE_TYPE			("device-type", 			Arrays.asList(new String[] { "Common" })),
 		DEVICE_REVISION		("device-revision", 		Arrays.asList(new String[] { "Common" })),
 		DEVICE_SUBTYPE		("device-subtype",			Arrays.asList(new String[] { "Common", "Optional"})),
-		SERIAL_NUMBER("device-serial-number", 	Arrays.asList(new String[] { "Common" })),
+		SERIAL_NUMBER("device-serial-number", 			Arrays.asList(new String[] { "Common" })),
 		DEVICE_PART_NUMBER	("device-part-number", 		Arrays.asList(new String[] { "Common" })),
 		PRODUCT_DESCRIPTION	("product-description", 	Arrays.asList(new String[] { "Common" })),
 		CONTACT_INFORMATION	("contact-information ",	Arrays.asList(new String[] { "Common", "Optional" })),
@@ -613,7 +614,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	public void run() {
 		logger.entry(command, serialPort);
 		try {
-			synchronized (serialPort) {
+			synchronized (SerialPort.class) {
 				switch (command) {
 				case CONNECT:
 					Status[] statuses = new Status[] { Status.CONNECTING.setMessage("Connecting"), Status.BUTTON.setMessage("Stop") };

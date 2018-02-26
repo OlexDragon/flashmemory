@@ -69,7 +69,6 @@ import irt.flash.data.connection.MicrocontrollerSTM32.Address;
 import irt.flash.data.connection.MicrocontrollerSTM32.Answer;
 import irt.flash.data.connection.MicrocontrollerSTM32.ProfileProperties;
 import irt.flash.data.connection.MicrocontrollerSTM32.Status;
-import irt.flash.data.connection.dao.DatabaseController;
 import irt.flash.presentation.dialog.MessageDialog;
 import jssc.SerialPortList;
 
@@ -86,21 +85,19 @@ public class ConnectionPanel extends JPanel implements Observer {
 	private static final String CONNECT = "Connect";
 	private static final String PRESS_CONNECT_BUTTON = "Press Connect Button";
 	public static final String SELECT_SERIAL_PORT = "Select Serial Port";
-	public static final String SERIAL_PORT = "serialPort";
+	public static final String SERIAL_PORT = "flashSerialPort";
 
 	protected static final Preferences prefs = Preferences.userRoot().node("IRT Technologies inc.");
 
 	private JComboBox<String> comboBoxComPort;
-
-	private JButton btnConnect;
-
-	private JLabel lblConnection;
-
 	private JComboBox<String> comboBoxUnitType;
 
+	private JLabel lblConnection;
+	private JLabel lblUnitType;
+
+	private JButton btnConnect;
 	private JButton btnRead;
 
-	private JLabel lblUnitType;
 
 	private JTextPane textPane;
 	private JPopupMenu popupMenu;
@@ -118,7 +115,6 @@ public class ConnectionPanel extends JPanel implements Observer {
 	private Selector selector = new Selector();
 
 	private volatile static byte[] buffer;
-	private volatile static DatabaseController databaseController = new DatabaseController();
 
 	public ConnectionPanel(Window owner) {
 		logger.info("* Start *");
@@ -358,7 +354,6 @@ public class ConnectionPanel extends JPanel implements Observer {
 								try {
 									dialog.setMessage(Status.ERASE.setMessage("Memory Erasing"));
 									MicrocontrollerSTM32.erase((String) comboBoxUnitType.getSelectedItem());
-									databaseController.reset();
 								} catch (Exception e) {
 									logger.catching(e);
 								}
@@ -545,7 +540,6 @@ public class ConnectionPanel extends JPanel implements Observer {
 		setLayout(groupLayout);
 
 		MicrocontrollerSTM32.getInstance().addObserver(this);
-		databaseController.setOwner(this);
 
 		KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(new KeyEventDispatcher() {
 
@@ -1024,7 +1018,6 @@ public class ConnectionPanel extends JPanel implements Observer {
 				if (readBytes != null) {
 					readBytes = removeEnd(readBytes);
 					setTextPaneText(readBytes);
-					databaseController.setProfile(readBytes);
 				} else {
 					setLabel(lblConnection, "Can Not read Memory", Color.RED);
 				}

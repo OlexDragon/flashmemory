@@ -16,12 +16,12 @@ import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 
 import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.Logger;
 
 public class FlashApp extends JFrame {
 	private static final long serialVersionUID = 3813033753839141111L;
 
-	private static final Logger logger = (Logger) LogManager.getLogger();
+	private static final Logger logger = LogManager.getLogger();
 
 	protected static final Preferences prefs = Preferences.userRoot().node("IRT Technologies inc.");
 	private JPanel contentPane;

@@ -9,6 +9,7 @@ public class PartNumber {
 	private long id;
 	private String partNumber;
 	private String description;
+
 	public long getId() {
 		return id;
 	}

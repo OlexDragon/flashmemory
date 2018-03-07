@@ -1,16 +1,11 @@
 package irt.flash.data;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
-
 public class ToHex {
-
-	private static final Logger logger = (Logger) LogManager.getLogger();
 
 	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
 
 	public static String bytesToHex(byte... bytes) {
-		logger.entry((Object)bytes);
+
 		String string = null;
 
 		if (bytes != null) {
@@ -25,11 +20,11 @@ public class ToHex {
 			string = new String(hexChars).trim();
 		}
 
+
 		return string;
 	}
 
 	public static byte parseToByte(String hexStr) {
-		logger.entry(hexStr);
 		byte result = 0;
 
 		if(hexStr!=null){
@@ -39,6 +34,6 @@ public class ToHex {
 				result = (byte) Character.digit(hexStr.charAt(0), 16);
 		}
 
-		return logger.exit(result);
+		return result;
 	}
 }

@@ -1,16 +1,25 @@
 package irt.flash.data.connection;
 
-import irt.flash.data.connection.MicrocontrollerSTM32.Answer;
-import irt.flash.presentation.panel.ConnectionPanel;
-
+import java.io.IOException;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.Optional;
+import java.util.TooManyListenersException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.prefs.Preferences;
-
-import jssc.SerialPortException;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Logger;
+
+import irt.flash.data.MyThreadFactory;
+import irt.flash.data.connection.MicrocontrollerSTM32.Answer;
+import irt.flash.presentation.panel.ConnectionPanel;
+import purejavacomm.NoSuchPortException;
+import purejavacomm.PortInUseException;
+import purejavacomm.UnsupportedCommOperationException;
 
 public class FlashConnector implements Observer{
 
@@ -18,9 +27,13 @@ public class FlashConnector implements Observer{
 
 	protected static final Preferences prefs = Preferences.userRoot().node("IRT Technologies inc.");
 
+	protected final static ExecutorService service = Executors.newSingleThreadScheduledExecutor(new MyThreadFactory());
+
 	private static FlashSerialPort serialPort;
 	private static FlashConnector connector = new FlashConnector();
-	private static boolean isConnected;
+	private static ConnectionStatus connectionStatus = ConnectionStatus.NOT_CONNECTED;
+
+	private static FutureTask<ConnectionStatus> futureTask;
 
 	private FlashConnector(){
 		logger.info("* Start *");
@@ -30,7 +43,7 @@ public class FlashConnector implements Observer{
 		return connector;
 	}
 
-	public static void connect() throws SerialPortException, InterruptedException {
+	public static FutureTask<ConnectionStatus> connect() throws InterruptedException, NoSuchPortException, PortInUseException, UnsupportedCommOperationException, IOException, TooManyListenersException {
 		logger.entry();
 
 		String serialPortStr = prefs.get(ConnectionPanel.SERIAL_PORT, ConnectionPanel.SELECT_SERIAL_PORT);
@@ -38,22 +51,34 @@ public class FlashConnector implements Observer{
 			disconnect();
 			serialPort = new FlashSerialPort(serialPortStr);
 			if(serialPort.openPort()){
-				MicrocontrollerSTM32.getInstance(serialPort).addObserver(getConnector());
+				connectionStatus = ConnectionStatus.NOT_CONNECTED;
+				MicrocontrollerSTM32.getInstance(serialPort).addObserver(connector);
 				MicrocontrollerSTM32.connect();
 			}
 		}
-		logger.exit();
+
+		logger.trace("EXIT Serial port {} is opend: {}", serialPort, serialPort.isOpened());
+
+		return futureTask =
+
+				new FutureTask<>(new Callable<ConnectionStatus>() {
+
+					@Override
+					public ConnectionStatus call() throws Exception {
+						return connectionStatus;
+					}
+				});
 	}
 
-	public static void disconnect() throws SerialPortException {
-		if(serialPort!=null && serialPort.isOpened())
+	public static void disconnect() {
+		if(serialPort!=null)
 			serialPort.closePort();
-		isConnected = false;
+		connectionStatus = ConnectionStatus.NOT_CONNECTED;
 		serialPort = null;
 	}
 
-	public static boolean isConnected() {
-		return isConnected;
+	public static ConnectionStatus getConnectionStatus() {
+		return connectionStatus;
 	}
 
 	@Override
@@ -87,14 +112,21 @@ public class FlashConnector implements Observer{
 	}
 
 	private void setConnected(byte[] bytes) {
+		logger.trace("ENTRY {}", bytes);
 		
-		if(bytes!=null && bytes.length==1)
-			isConnected = bytes[0]==Answer.ACK.getAnswer();
-		else
-			isConnected = false;
+		Optional
+		.ofNullable(bytes)
+		.filter(bs->bs.length==1)
+		.map(bs->bs[0]==Answer.ACK.getAnswer())
+		.ifPresent(ack->{
+			connectionStatus = ack ? ConnectionStatus.CONNECTED : ConnectionStatus.NOT_CONNECTED;
+			Optional.ofNullable(futureTask).ifPresent(service::execute);
+			logger.trace("connectionStatus: {};", connectionStatus);
+		});
+
 	}
 
-	public static void write(String serialPortStr, byte[] bytes) throws SerialPortException {
+	public static void write(String serialPortStr, byte[] bytes) throws NoSuchPortException, PortInUseException, UnsupportedCommOperationException, IOException, TooManyListenersException{
 		if(serialPort!=null && serialPort.isOpened())
 			disconnect();
 
@@ -104,5 +136,11 @@ public class FlashConnector implements Observer{
 			serialPort.writeBytes(bytes);
 			disconnect();
 		}
+	}
+
+	public enum ConnectionStatus{
+		NOT_CONNECTED,
+		CONNECTED,
+		CONNECTING;
 	}
 }

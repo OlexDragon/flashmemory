@@ -7,11 +7,11 @@ import java.util.Scanner;
 import java.util.concurrent.Callable;
 
 import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.Logger;
 
 public class Profile {
 
-	private static final Logger logger = (Logger) LogManager.getLogger();
+	private static final Logger logger = LogManager.getLogger();
 
 	public static final String PROFILE_HEADER =	"# IRT Technologies board environment config\n"+
 												"# First two lines must start from this text - do not modify";
@@ -63,7 +63,7 @@ public class Profile {
 				}
 			}
 
-		return logger.exit(profile);
+		return profile;
 	}
 
 	private static void setTableRow(Profile profile, String[] processLine) {
@@ -78,7 +78,6 @@ public class Profile {
 			table.addRow(processLine);
 		else
 			profile.tables.add(t);
-		logger.exit();
 	}
 
 	public static String[] processLine(String nextLine) {
@@ -108,7 +107,7 @@ public class Profile {
 		if(i>=0)
 			nextLine = nextLine.substring(0, i);
 
-		return logger.exit(nextLine);
+		return nextLine;
 	}
 
 	public Properties getProperties() {

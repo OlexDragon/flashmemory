@@ -20,6 +20,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
@@ -34,6 +36,7 @@ import java.util.Observable;
 import java.util.Observer;
 import java.util.Optional;
 import java.util.Scanner;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
@@ -64,16 +67,16 @@ import org.apache.logging.log4j.Logger;
 
 import irt.flash.data.ToHex;
 import irt.flash.data.connection.FlashConnector;
+import irt.flash.data.connection.FlashConnector.ConnectionStatus;
+import irt.flash.data.connection.FlashSerialPort;
 import irt.flash.data.connection.MicrocontrollerSTM32;
 import irt.flash.data.connection.MicrocontrollerSTM32.Address;
 import irt.flash.data.connection.MicrocontrollerSTM32.Answer;
 import irt.flash.data.connection.MicrocontrollerSTM32.ProfileProperties;
 import irt.flash.data.connection.MicrocontrollerSTM32.Status;
 import irt.flash.presentation.dialog.MessageDialog;
-import jssc.SerialPortList;
 
 public class ConnectionPanel extends JPanel implements Observer {
-	public static final String UPLOAD_DATE = "#Upload Date:";
 
 	private static final long serialVersionUID = -79571598522363841L;
 
@@ -97,7 +100,6 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 	private JButton btnConnect;
 	private JButton btnRead;
-
 
 	private JTextPane textPane;
 	private JPopupMenu popupMenu;
@@ -144,8 +146,9 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 		addAncestorListener(new AncestorListener() {
 			public void ancestorAdded(AncestorEvent ancestorEvent) {
+				final List<String> portNames = FlashSerialPort.getPortNames();
 				DefaultComboBoxModel<String> defaultComboBoxModel = new DefaultComboBoxModel<String>(
-						SerialPortList.getPortNames());
+						portNames.toArray(new String[portNames.size()]));
 				defaultComboBoxModel.insertElementAt(SELECT_SERIAL_PORT, 0);
 				comboBoxComPort.setModel(defaultComboBoxModel);
 				comboBoxComPort.addItemListener(new ItemListener() {
@@ -349,11 +352,11 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 					@Override
 					protected Void doInBackground() throws Exception {
-						if (FlashConnector.isConnected()) {
+						if (FlashConnector.getConnectionStatus()==ConnectionStatus.CONNECTED) {
 							if (btnRead.isEnabled()) {
 								try {
 									dialog.setMessage(Status.ERASE.setMessage("Memory Erasing"));
-									MicrocontrollerSTM32.erase((String) comboBoxUnitType.getSelectedItem());
+									MicrocontrollerSTM32.erase((String) comboBoxUnitType.getSelectedItem()).get(5, TimeUnit.SECONDS);
 								} catch (Exception e) {
 									logger.catching(e);
 								}
@@ -646,7 +649,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		logger.trace("CON Port is Selected = {}", selected);
 
 		if (selected) {
-			if (FlashConnector.isConnected())
+			if (FlashConnector.getConnectionStatus()==ConnectionStatus.CONNECTED)
 				setLabel(lblConnection, "Connected", Color.GREEN);
 			else
 				setLabel(lblConnection, PRESS_CONNECT_BUTTON, Color.YELLOW);
@@ -659,7 +662,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 			@Override
 			protected Void doInBackground() throws Exception {
-				if (FlashConnector.isConnected()) {
+				if (FlashConnector.getConnectionStatus()==ConnectionStatus.CONNECTED) {
 					try {
 						FlashConnector.disconnect();
 					} catch (Exception e) {
@@ -713,7 +716,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 	private boolean isConnected() {
 		boolean connected = true;
-		if (!FlashConnector.isConnected()) {
+		if (FlashConnector.getConnectionStatus()!=ConnectionStatus.CONNECTED) {
 			connected = false;
 			JOptionPane.showMessageDialog(ConnectionPanel.this, "The Unit Is Not Connected.");
 		} else if (!btnRead.isEnabled()) {
@@ -790,7 +793,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 				return null;
 			}
 
-			private void uploadProfileFromFile() throws FileNotFoundException, InterruptedException {
+			private void uploadProfileFromFile() throws FileNotFoundException, InterruptedException, UnknownHostException {
 
 				JFileChooser fc = new JFileChooser();
 				fc.setDialogTitle("Upload Profile...");
@@ -863,11 +866,14 @@ public class ConnectionPanel extends JPanel implements Observer {
 									prefs.put(key, path);
 								}
 
-
-								// Time stamp
-								Date date = new Date();
-								Timestamp timestamp = new Timestamp(date.getTime());
-								fileContents.append(UPLOAD_DATE).append(timestamp).append('\0');
+// Signature
+								fileContents
+								.append("\n#Uploaded by STM32 on ")
+								.append(new Timestamp(new Date().getTime()))
+								.append(" from ")
+								.append(InetAddress.getLocalHost().getHostName())
+								.append(" computer.")
+								.append('\0');
 
 								MicrocontrollerSTM32.writeProfile((String) selectedUnitType, fileContents.toString());
 							}
@@ -920,7 +926,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		protected Void doInBackground() throws Exception {
 			try {
 
-				MicrocontrollerSTM32.read((String) comboBoxUnitType.getSelectedItem());
+				MicrocontrollerSTM32.read((String) comboBoxUnitType.getSelectedItem()).get(1, TimeUnit.SECONDS);
 
 			} catch (InterruptedException e) {
 				logger.catching(e);
@@ -1076,11 +1082,11 @@ public class ConnectionPanel extends JPanel implements Observer {
 	}
 
 	private void setReadButton() {
-		boolean connected = FlashConnector.isConnected();
-		if (!comboBoxUnitType.getSelectedItem().equals(Address.CONVERTER.toString()) && !connected)
+		ConnectionStatus connected = FlashConnector.getConnectionStatus();
+		if (!comboBoxUnitType.getSelectedItem().equals(Address.CONVERTER.toString()) && connected!=ConnectionStatus.CONNECTED)
 			setEnableReadButton(FCM_UPGRADE, FCM_UPGRADE, true);
 		else
-			setEnableReadButton("Read", "Read Profile", comboBoxUnitType.getSelectedIndex() > 0 && connected);
+			setEnableReadButton("Read", "Read Profile", comboBoxUnitType.getSelectedIndex() > 0 && connected==ConnectionStatus.CONNECTED);
 	}
 
 	private void setEnableReadButton(String text, String toolTipText, boolean enable) {

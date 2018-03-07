@@ -1,28 +1,34 @@
 package irt.flash.data.connection;
 
-import irt.flash.data.ToHex;
-
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Observable;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 
-import jssc.SerialPort;
-import jssc.SerialPortException;
-
-import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.Logger;
+
+import irt.flash.data.MyThreadFactory;
+import irt.flash.data.ToHex;
+import purejavacomm.SerialPort;
 
 public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
 	public static final int KB = 1024;
 
-	private static final Logger logger = (Logger) LogManager.getLogger();
+	private static final Logger logger = LogManager.getLogger();
 
 	public static final String BIAS_BOARD = "Bias Board";
 	public static final String HP_BIAS_BOARD = "HP Bias Board";
+
+	private static Answer commandAnswer;
 
 	public enum ProfileProperties {
 		/**
@@ -139,6 +145,9 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			return this;
 		}
 
+		public String toString(){
+			return name() + " : " + message;
+		}
 	}
 
 	public enum Address {
@@ -197,6 +206,11 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		public String toString() {
 			return name+"(0x"+ToHex.bytesToHex(answer)+ ")";
 		}
+
+		public static Answer parse(byte b){
+			Answer.UNKNOWN.setAnswer((byte) -1);
+			return Arrays.stream(values()).filter(v->v.getAnswer()==b).findAny().orElse(Answer.UNKNOWN.setAnswer(b));
+		}
 	}
 
 	public enum Command {
@@ -245,6 +259,8 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		}
 	}
 
+	protected final static ExecutorService service = Executors.newSingleThreadScheduledExecutor(new MyThreadFactory());
+
 	public static final int COMMAND_NON = 0;
 	public static final byte GET_VERSION_AND_READ_PROTECTION_STATUS = 0x01;
 	public static final byte COMMAND_GET_ID = 0x02;
@@ -264,10 +280,13 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	private volatile static byte[] buffer;
 	private volatile static Address address;
 
+	private static FutureTask<byte[]> futureTask;
+
+	private static FutureTask<Answer> eraseTask;
+
 	private volatile Command command;
 	private int waitingByteCount;
 	private int waitTime = 1000;
-	private volatile Answer lastAnswer;
 
 	private MicrocontrollerSTM32() {
 		logger.info("* Start *");
@@ -284,13 +303,13 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
 	@Override
 	public void notifyObservers(Object obj) {
-		logger.trace(obj);
+		logger.trace("{}", obj);
 		setChanged();
 		super.notifyObservers(obj);
 	}
 
-	private boolean writeToFlashMemory() throws SerialPortException, InterruptedException {
-		logger.entry();
+	private boolean writeToFlashMemory() throws InterruptedException, IOException {
+		logger.traceEntry();
 
 		int length = 256;
 		int readFrom = 0;
@@ -305,14 +324,16 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			boolean error = false;
 			while (true) {
 
-				if (sendCommand(Command.WRITE_MEMORY)) {
-					if (sendCommand(Command.USER_COMMAND.setUserCommand("Send Address", addCheckSum(getBytes(addr))))) {
+				Answer answer;
+				if ((answer=sendCommand(Command.WRITE_MEMORY))==Answer.ACK) {
+					if ((answer=sendCommand(Command.USER_COMMAND.setUserCommand("Send Address", addCheckSum(getBytes(addr)))))==Answer.ACK) {
 						int readTo = readFrom + length;
 						readTo = readTo <= buffer.length ? readTo : buffer.length;
-						if (sendCommand(Command.USER_COMMAND.setUserCommand("Send Data", addCheckSum(addDataLength(Arrays.copyOfRange(buffer, readFrom, readTo)))))) {
+						if ((answer=sendCommand(Command.USER_COMMAND.setUserCommand("Send Data length", addCheckSum(addDataLength(Arrays.copyOfRange(buffer, readFrom, readTo))))))==Answer.ACK) {
 							addr += length;
 							readFrom = readTo;
 							BigDecimal percent = new BigDecimal(readFrom).divide(onePercent, 2, RoundingMode.HALF_EVEN);
+
 							if (readFrom < buffer.length)
 								notifyObservers(percent);
 							else {
@@ -322,12 +343,19 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 								break;
 							}
 						} else {
+							logger.warn("Send Data length ERROR. answer: {}", answer);
 							error = true;
 							notifyObservers(new Status[] { Status.ERROR.setMessage("ERROR.(Command." + Command.USER_COMMAND + ")"), Status.BUTTON.setMessage("Ok") });
 							break;
 						}
+					}else{
+						logger.warn("Send Address ERROR. answer: {}", answer);
+						error = true;
+						notifyObservers(new Status[] { Status.ERROR.setMessage("ERROR.(Command." + Command.USER_COMMAND + ")"), Status.BUTTON.setMessage("Ok") });
+						break;
 					}
 				} else {
+					logger.warn("WRITE MEMORY ERROR. answer: {}", answer);
 					error = true;
 					notifyObservers(new Status[] { Status.ERROR.setMessage("ERROR.(Command." + Command.USER_COMMAND + ")"), Status.BUTTON.setMessage("Ok") });
 					break;
@@ -336,14 +364,15 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			if (!error)
 				notifyObservers((Object) null);
 		} else {
+			logger.warn("ERASE MEMORY ERROR.");
 			notifyObservers(new Status[] { Status.ERROR.setMessage("ERROR.(Command.Erasing The Flash Memory.)"), Status.BUTTON.setMessage("Ok") });
 		}
 
-		return logger.exit(readFrom >= buffer.length);
+		return readFrom >= buffer.length;
 	}
 
-	private boolean eraseFlash() throws SerialPortException {
-		logger.entry(waitTime);
+	private boolean eraseFlash() throws IOException{
+		logger.traceEntry();
 		int tmp = waitTime;
 		waitTime = 15000;
 
@@ -357,11 +386,16 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 
 		logger.debug("pagesToErase: {}", pagesToErase);
 
-		boolean isDon = sendCommand(Command.EXTENDED_ERASE) && sendCommand(Command.USER_COMMAND.setUserCommand("Pages To Erase", addCheckSum(addLength(pagesToErase))));
+		Answer sendCommand = sendCommand(Command.EXTENDED_ERASE);
+
+		if(sendCommand==Answer.ACK )
+			sendCommand = sendCommand(Command.USER_COMMAND.setUserCommand("Pages To Erase", addCheckSum(addLength(pagesToErase))));
 
 		waitTime = tmp;
 
-		return isDon;
+		MyThreadFactory.startThread(eraseTask);
+
+		return sendCommand==Answer.ACK ;
 	}
 
 	private byte[] addDataLength(byte[] data) {
@@ -411,7 +445,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			buffer = Arrays.copyOf(buffer, length + 4 - end);
 			Arrays.fill(buffer, length, buffer.length, (byte) 0xff);
 		}
-		logger.exit(buffer.length);
+		logger.traceExit(buffer.length);
 	}
 
 	private byte[] addLength(byte[] pages) {
@@ -423,8 +457,8 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		return toSend;
 	}
 
-	private boolean readFlashMemory() throws SerialPortException {
-		logger.entry();
+	private boolean readFlashMemory() throws IOException{
+		logger.traceEntry();
 
 		boolean isRead = false;
 		byte[] endBytes = new byte[] { (byte) 0xFF, (byte) 0xFF, (byte) 0xFF };
@@ -440,12 +474,13 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			for (int i = 0; i < ((MicrocontrollerSTM32.KB * 128) / MAX_VAR_RAM_SIZE); i++) {// max
 																			// 128K
 																			// bite
+				Answer answer;
 			// "read Command");
-				if (sendCommand(Command.READ_MEMORY)) {
+				if ((answer=sendCommand(Command.READ_MEMORY))==Answer.ACK) {
 					// "Send Address");
-					if (sendCommand(Command.USER_COMMAND.setUserCommand("Send Address", addCheckSum(getBytes(addr))))) {
+					if ((answer=sendCommand(Command.USER_COMMAND.setUserCommand("Send Address", addCheckSum(getBytes(addr)))))==Answer.ACK) {
 						// "Send Length");
-						if (sendCommand(Command.USER_COMMAND.setUserCommand("Send Length", new byte[] { (byte) length, (byte) (length ^ 0xFF) }))) {
+						if ((answer=sendCommand(Command.USER_COMMAND.setUserCommand("Send Length", new byte[] { (byte) length, (byte) (length ^ 0xFF) })))==Answer.ACK) {
 							byte[] read = serialPort.readBytes(MAX_VAR_RAM_SIZE);
 							if (read != null) {
 								buffer = addArray(buffer, read);
@@ -454,49 +489,47 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 									break;
 								}
 							} else {
-								notifyObservers(Status.ERROR.setMessage(Command.USER_COMMAND + " Error.(" + lastAnswer + ")"));
+								logger.warn("ERROR. read: {}", read);
+								notifyObservers(Status.ERROR.setMessage(Command.USER_COMMAND + " Error.(" + answer + ")"));
 								break;
 							}
 						} else {
-							notifyObservers(Status.ERROR.setMessage(Command.USER_COMMAND + " Error.(" + lastAnswer + ")"));
+							logger.warn("Send Length ERROR. answer: {}", answer);
+							notifyObservers(Status.ERROR.setMessage(Command.USER_COMMAND + " Error.(" + answer + ")"));
 							break;
 						}
 					} else {
-						notifyObservers(Status.ERROR.setMessage(Command.USER_COMMAND + " Error.(" + lastAnswer + ")"));
+						logger.warn("Send Address ERROR. answer: {}", answer);
+						notifyObservers(Status.ERROR.setMessage(Command.USER_COMMAND + " Error.(" + answer + ")"));
 						break;
 					}
 				} else {
-					notifyObservers(Status.ERROR.setMessage(Command.READ_MEMORY + " Error.(" + lastAnswer + ")"));
+					logger.warn("READ_MEMORY ERROR. answer: {}", answer);
+					notifyObservers(Status.ERROR.setMessage(Command.READ_MEMORY + " Error.(" + answer + ")"));
 					break;
 				}
 				addr += MAX_VAR_RAM_SIZE;
 			}
 		}
 
-		return logger.exit(isRead);
+		MyThreadFactory.startThread(futureTask);
+		return logger.traceExit(isRead);
 	}
 
-	private boolean sendCommand(Command command) throws SerialPortException {
-		logger.entry(command);
+	private Answer sendCommand(Command command) throws IOException {
+		logger.traceEntry(()->command, ()->ToHex.bytesToHex(command.toBytes()));
 
-		Level level = logger.getLevel();
-		if(level==Level.ALL || level==Level.TRACE)
-			logger.trace("Write ={}", ToHex.bytesToHex(command.toBytes()));
 		serialPort.writeBytes(command);
 
-		byte[] readBytes = serialPort.readBytes(1, waitTime);
+		byte[] readBytes;
+		long start = System.currentTimeMillis();
+		do{
+			readBytes= serialPort.readBytes(1);
+		}while(readBytes==null && System.currentTimeMillis()-start<=waitTime);
 
-		if (readBytes == null)
-			lastAnswer = Answer.NULL;
-		else if (readBytes[0] == Answer.ACK.getAnswer())
-			lastAnswer = Answer.ACK;
-		else if (readBytes[0] == Answer.NACK.getAnswer())
-			lastAnswer = Answer.NACK;
-		else
-			lastAnswer =  Answer.UNKNOWN.setAnswer(readBytes[0]);
+		logger.trace("EXIT Answer: {}", readBytes);
 
-		logger.trace("Answer.{}", lastAnswer);
-		return logger.exit(lastAnswer == Answer.ACK);
+		return commandAnswer = Optional.ofNullable(readBytes).map(bs->bs[0]).map(Answer::parse).orElse(Answer.NULL);
 	}
 
 	private byte[] addCheckSum(byte[] original) {
@@ -536,28 +569,40 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		runThread(Command.CONNECT);
 	}
 
-	public static void read(String unitType) throws InterruptedException {
-		read(getAddress(unitType));
+	public static FutureTask<byte[]> read(String unitType) throws InterruptedException {
+		return read(getAddress(unitType));
 	}
 
-	public static void read(Address address) throws InterruptedException {
+	public static FutureTask<byte[]> read(Address address) throws InterruptedException {
 		MicrocontrollerSTM32.address = address;
 		microcontrollerSTM32.waitingByteCount = MAX_VAR_RAM_SIZE;
+
+		futureTask = new FutureTask<byte[]>(new Callable<byte[]>() {
+
+			@Override
+			public byte[] call() throws Exception {
+				return buffer;
+			}
+		});
+
 		runThread(Command.READ_MEMORY);
+
+		return futureTask;
 	}
 
 	private static Thread runThread(Command command) throws InterruptedException {
 		logger.entry(command);
-		if (microcontrollerSTM32 != null) {
-			if (thread != null)
-				thread.join();
-			microcontrollerSTM32.command = command;
-			thread = new Thread(microcontrollerSTM32);
-			thread.setPriority(Thread.MAX_PRIORITY);
-			thread.setDaemon(true);
-			thread.start();
+
+		if(service.isTerminated()){
+			logger.error("Test message. Have to add some code");
+			return null;
 		}
-		return logger.exit(thread);
+
+		microcontrollerSTM32.command = command;
+
+		service.execute(microcontrollerSTM32);
+
+		return thread;
 	}
 
 	public synchronized byte[] getReadBytes() {
@@ -574,7 +619,6 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	}
 
 	private static Address getAddress(String unitType) {
-		logger.entry(unitType);
 
 		Address address = null;
 		for(Address a:Address.values())
@@ -601,13 +645,16 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		runThread(Command.WRITE_MEMORY);
 	}
 
-	public static void erase(String unitType) throws InterruptedException {
-		erase(getAddress(unitType));
+	public static FutureTask<Answer> erase(String unitType) throws InterruptedException {
+		return erase(getAddress(unitType));
 	}
 
-	private static void erase(Address address) throws InterruptedException {
+	private static FutureTask<Answer> erase(Address address) throws InterruptedException {
+
 		MicrocontrollerSTM32.address = address;
 		runThread(Command.ERASE);
+
+		return eraseTask = new FutureTask<>(()->commandAnswer);
 	}
 
 	@Override
@@ -618,7 +665,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 				switch (command) {
 				case CONNECT:
 					Status[] statuses = new Status[] { Status.CONNECTING.setMessage("Connecting"), Status.BUTTON.setMessage("Stop") };
-					logger.trace("CONNECT; notifyObservers:{}", (Object)statuses);
+					logger.trace("CONNECT; notifyObservers:{}", (Object[])statuses);
 					notifyObservers(statuses);
 					serialPort.writeBytes(command);
 					buffer = serialPort.readBytes(waitingByteCount);
@@ -651,6 +698,6 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		}
 		logger.trace("notifyObservers(); Obsorvers Count = {}", microcontrollerSTM32.countObservers());
 		notifyObservers();
-		logger.exit();
+		logger.traceExit();
 	}
 }

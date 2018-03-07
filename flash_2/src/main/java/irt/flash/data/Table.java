@@ -6,12 +6,12 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.Logger;
 
 
 public class Table {
 
-	private final Logger logger = (Logger) LogManager.getLogger();
+	private final Logger logger = LogManager.getLogger();
 
 	protected String name;
 	private TreeMap<BigDecimal, BigDecimal> tableMap = new TreeMap<>();
@@ -53,7 +53,7 @@ public class Table {
 
 			}
 		}
-		return logger.exit(set);
+		return set;
 	}
 
 	public void addRow(Entry<BigDecimal, BigDecimal> entry) {
@@ -82,7 +82,7 @@ public class Table {
 
 		logger.trace("Entry<BigDecimal, BigDecimal>[] array ={}", (Object[])array);
 
-		return logger.exit(array.length>rowIndex ? array[rowIndex ] : null);
+		return array.length>rowIndex ? array[rowIndex ] : null;
 	}
 
 	public void remove(BigDecimal key) {

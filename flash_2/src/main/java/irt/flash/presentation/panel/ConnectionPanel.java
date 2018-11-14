@@ -57,6 +57,7 @@ import javax.swing.JTabbedPane;
 import javax.swing.JTextPane;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
@@ -182,7 +183,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		btnConnect = new JButton(CONNECT);
 		btnConnect.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent actionEvent) {
-				new ConnectionWorker().execute();
+				SwingUtilities.invokeLater(connectionWorker);
 			}
 		});
 		btnConnect.setFont(new Font("Tahoma", Font.BOLD, 14));
@@ -215,7 +216,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 							synchronized (this) {
 								wait(2000);
 							}
-							new ConnectionWorker().execute();
+							SwingUtilities.invokeLater(connectionWorker);
 
 						} catch (Exception e) {
 							logger.catching(e);
@@ -575,10 +576,6 @@ public class ConnectionPanel extends JPanel implements Observer {
 					ctrl = false;
 					break;
 
-//				case KeyEvent.VK_SHIFT:
-//					shift = false;
-//					break;
-
 				case KeyEvent.VK_EQUALS:
 					if(ctrl) selector.change(comboBoxUnitType, true);
 					break;
@@ -594,7 +591,11 @@ public class ConnectionPanel extends JPanel implements Observer {
 					break;
 
 				case KeyEvent.VK_C:
-					if(ctrl) new ConnectionWorker().execute();
+					if(!ctrl)
+						return;
+					boolean isSelected = Optional.ofNullable(textPane.getSelectedText()).filter(t->!t.isEmpty()).isPresent();
+					if(!isSelected)	// if text is selected do nothing
+						SwingUtilities.invokeLater(connectionWorker);
 					break;
 
 				case KeyEvent.VK_R:
@@ -615,9 +616,9 @@ public class ConnectionPanel extends JPanel implements Observer {
 					break;
 				default:
 					if(ctrl)
-						if(keyCode<=KeyEvent.VK_0 || keyCode<=KeyEvent.VK_9)
+						if(keyCode>=KeyEvent.VK_0 && keyCode<=KeyEvent.VK_9)
 							selector.select(comboBoxUnitType, keyCode-48);
-						else if(keyCode<=KeyEvent.VK_NUMPAD0 || keyCode<=KeyEvent.VK_NUMPAD9)
+						else if(keyCode>=KeyEvent.VK_NUMPAD0 && keyCode<=KeyEvent.VK_NUMPAD9)
 							selector.select(comboBoxComPort, keyCode-96);
 						
 							
@@ -885,39 +886,35 @@ public class ConnectionPanel extends JPanel implements Observer {
 		}.execute();
 	}
 
-	// ******************************************* ConnectionWorker
-	// *************************************************************
-	private class ConnectionWorker extends SwingWorker<Void, Void> {
-
-		@Override
-		protected Void doInBackground() throws Exception {
-			String text = btnConnect.getText();
-			logger.entry(text);
-			try {
-				switch (text) {
-				case CONNECT:
-					logger.trace(CONNECT);
-					btnConnect.setText("Cancel");
-					FlashConnector.connect();
-					textPane.setText("");
-					break;
-				case DISCONNECT:
-					logger.trace("disconnect");
-					disconnect();
-					setLabel(lblConnection, PRESS_CONNECT_BUTTON, Color.YELLOW);
-					break;
-				default:
-					logger.trace("default");
-				}
-			} catch (Exception e) {
-				logger.catching(e);
-				JOptionPane.showMessageDialog(ConnectionPanel.this, e.getLocalizedMessage());
+	//	*************************************************************************
+	//	*							Connection Worker							*
+	//	*************************************************************************
+	private final Runnable connectionWorker = ()->{
+		String text = btnConnect.getText();
+		logger.entry(text);
+		try {
+			switch (text) {
+			case CONNECT:
+				logger.trace(CONNECT);
+				btnConnect.setText("Cancel");
+				FlashConnector.connect();
+				textPane.setText("");
+				break;
+			case DISCONNECT:
+				logger.trace("disconnect");
 				disconnect();
 				setLabel(lblConnection, PRESS_CONNECT_BUTTON, Color.YELLOW);
+				break;
+			default:
+				logger.trace("default");
 			}
-			return null;
+		} catch (Exception e) {
+			logger.catching(e);
+			JOptionPane.showMessageDialog(ConnectionPanel.this, e.getLocalizedMessage());
+			disconnect();
+			setLabel(lblConnection, PRESS_CONNECT_BUTTON, Color.YELLOW);
 		}
-	}
+	};
 
 	// ******************************************* ReaderWorker *************************************************************
 	private class ReaderWorker extends SwingWorker<Void, Void> {
@@ -1095,8 +1092,10 @@ public class ConnectionPanel extends JPanel implements Observer {
 		btnRead.setEnabled(enable);
 	}
 
+	// **********************************************************************************************
+	// *									Selector												*
+	// **********************************************************************************************
 	private boolean busy;
-	// ******************************************* Selector *************************************************************
 	private class Selector{
 
 		public void change(JComboBox<String> comboBox, boolean increase) {

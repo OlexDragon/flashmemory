@@ -12,7 +12,7 @@ import java.util.concurrent.FutureTask;
 import java.util.prefs.Preferences;
 
 import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.Logger;
 
 import irt.flash.data.MyThreadFactory;
 import irt.flash.data.connection.MicrocontrollerSTM32.Answer;
@@ -44,7 +44,6 @@ public class FlashConnector implements Observer{
 	}
 
 	public static FutureTask<ConnectionStatus> connect() throws InterruptedException, NoSuchPortException, PortInUseException, UnsupportedCommOperationException, IOException, TooManyListenersException {
-		logger.entry();
 
 		String serialPortStr = prefs.get(ConnectionPanel.SERIAL_PORT, ConnectionPanel.SELECT_SERIAL_PORT);
 		if(!serialPortStr.equals(ConnectionPanel.SELECT_SERIAL_PORT)){

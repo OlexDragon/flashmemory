@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.util.TooManyListenersException;
 
 import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.Logger;
 import org.junit.After;
 import org.junit.Test;
 
@@ -17,7 +17,7 @@ import purejavacomm.UnsupportedCommOperationException;
 
 public class FlashSerialPortTest {
 
-	private final Logger logger = (Logger) LogManager.getLogger();
+	private final Logger logger = LogManager.getLogger();
 
 	private FlashSerialPort serialPort;
 	private String portName = "COM13";
@@ -36,7 +36,6 @@ public class FlashSerialPortTest {
 		if(!opened)
 			assertTrue(serialPort.openPort());
 
-		logger.exit();
 	}
 
 	@Test
@@ -54,13 +53,10 @@ public class FlashSerialPortTest {
 		}else{
 			assertFalse(closed);
 		}
-		logger.exit(closed);
 	}
 
 	@After
 	public void closePort() {
-		logger.entry();
 		serialPort.closePort();
-		logger.exit();
 	}
 }

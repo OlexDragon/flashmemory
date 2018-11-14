@@ -12,7 +12,7 @@ import java.util.Optional;
 import java.util.TooManyListenersException;
 
 import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.Logger;
 
 import irt.flash.data.ToHex;
 import irt.flash.data.connection.MicrocontrollerSTM32.Command;
@@ -26,7 +26,7 @@ import purejavacomm.UnsupportedCommOperationException;
 
 public class FlashSerialPort {
 
-	private final Logger logger = (Logger) LogManager.getLogger();
+	private final Logger logger = LogManager.getLogger();
 
 	public static final int MAX_WAIT_TIME = 10000;
     public static final int BAUDRATE = JTermios.B115200;

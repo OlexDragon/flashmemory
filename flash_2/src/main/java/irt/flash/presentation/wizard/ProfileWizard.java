@@ -9,11 +9,11 @@ import javax.swing.JDialog;
 import javax.swing.JPanel;
 import javax.swing.JToolBar;
 
-public class ProfileWithard  extends JDialog{
+public class ProfileWizard  extends JDialog{
 	private static final long serialVersionUID = 1L;
 
 
-	public ProfileWithard(Window owner) {
+	public ProfileWizard(Window owner) {
 		super(owner, "Profile Wizard");
 
 		setTitle("Profile Wizard");

@@ -192,8 +192,6 @@ public class MessageDialog extends JDialog{
 			button.setText("Ok");
 			Thread.sleep(1);
 			resize();
-
-			logger.exit();
 		}
 
 		private void setMessage(Status[] statuses) throws InterruptedException {
@@ -206,7 +204,6 @@ public class MessageDialog extends JDialog{
 				}else
 					new StatusWorker(s).execute();
 			}
-			logger.exit();
 		}
 
 		private void setProgressBar(BigDecimal bigDecimal) throws InterruptedException {
@@ -218,11 +215,9 @@ public class MessageDialog extends JDialog{
 				panelProgressBar.setVisible(true);
 				resize();
 			}
-			logger.exit();
 		}
 
 		private synchronized void resize() throws InterruptedException {
-			logger.entry();
 			Thread.sleep(1);
 			pack();
 
@@ -260,7 +255,6 @@ public class MessageDialog extends JDialog{
 								}
 							}
 						});
-			logger.exit();
 		}
 
 		private class StatusWorker extends SwingWorker<Void, Void>{
@@ -295,7 +289,6 @@ public class MessageDialog extends JDialog{
 						setVisible(false);
 				}
 
-				logger.exit();
 				return null;
 			}
 		}

@@ -7,6 +7,10 @@ import java.awt.Insets;
 import java.awt.KeyEventDispatcher;
 import java.awt.KeyboardFocusManager;
 import java.awt.Window;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
@@ -14,14 +18,19 @@ import java.awt.event.ItemListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
@@ -29,6 +38,7 @@ import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -121,6 +131,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 	public ConnectionPanel(Window owner) {
 		logger.info("* Start *");
+
 		dialog = MessageDialog.getInstance(owner);
 		dialog.addButtonActionListener(new ActionListener() {
 
@@ -333,8 +344,203 @@ public class ConnectionPanel extends JPanel implements Observer {
 		tabbedPane.addTab("Profile", null, scrollPane, null);
 
 		textPane = new JTextPane();
+		textPane.addMouseMotionListener(new MouseMotionAdapter() {
+			@Override
+			public void mouseDragged(MouseEvent e) {
+				logger.error(e);
+			}
+		});
 		textPane.setEditable(false);
 		scrollPane.setViewportView(textPane);
+
+		textPane.setDropTarget(new DropTarget() {
+			private static final long serialVersionUID = 1701997845933592909L;
+
+			@Override
+			public synchronized void drop(DropTargetDropEvent e) {
+		        try {
+		            e.acceptDrop(DnDConstants.ACTION_COPY);
+		            List<?> droppedFiles = (List<?>)e.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
+
+		            if(FlashConnector.getConnectionStatus()!=ConnectionStatus.CONNECTED) {
+		            	JOptionPane.showMessageDialog(ConnectionPanel.this, "The unit is not connected.");
+		            	return;
+		            }
+
+		            if(droppedFiles.size()!=1) {
+		            	JOptionPane.showMessageDialog(ConnectionPanel.this, "Only one file is allowed.");
+		            	return;
+		            }
+		            File file = (File)droppedFiles.get(0);
+
+		            if(!file.isFile()) {
+		            	JOptionPane.showMessageDialog(ConnectionPanel.this, "No file selected.");
+		            	return;
+		            }
+
+		            Object[] options1 = {"Copy and upload file with new serial number", "Upload file without change"};
+		            final int decision = JOptionPane.showOptionDialog(
+		            		ConnectionPanel.this,
+		            		"Select one of two option:",
+		            		"Upload file.",
+		            		JOptionPane.YES_NO_OPTION,
+		            		JOptionPane.INFORMATION_MESSAGE,
+		            		null, options1, null);
+
+		            switch(decision){
+		            case 0:
+		            	try(BufferedReader br = new BufferedReader(new FileReader(file))){
+
+		            		StringBuffer inputBuffer = new StringBuffer();
+
+		            		final int deviceType = getDeviceType(br, inputBuffer);
+							if(deviceType<0) {
+		            			JOptionPane.showMessageDialog(ConnectionPanel.this, "Missing device type.");
+		            			return;
+		            		}
+		            		final boolean converter = deviceType>=1000;
+
+							String newSN = getNewSerialNumber(converter);
+		            		if(newSN==null)return;
+
+		            		setSerialNumber(newSN, br, inputBuffer);
+
+		            		if(converter) {
+
+					            Object[] options2 = {"Internal", "External", "Auto"};
+					            int selectedLock = JOptionPane.showOptionDialog(
+					            		ConnectionPanel.this,
+					            		"Select lock type:",
+					            		"Lock select.",
+					            		JOptionPane.YES_NO_OPTION,
+					            		JOptionPane.INFORMATION_MESSAGE,
+					            		null, options2, null);
+
+					            if(selectedLock>=0) {
+					            	setLockType(++selectedLock, br, inputBuffer);
+					            	removeClockCapabilities(br, inputBuffer);
+					            }
+		            		}
+
+		            		fillBuffer(br, inputBuffer);
+
+							inputBuffer.toString().trim();
+
+							final String fileName = newSN + ".bin";
+		            		final Path path = Optional.ofNullable(file.getParentFile()).map(f->Paths.get(f.getAbsolutePath(), fileName)).orElseGet(()->Paths.get(fileName));
+		            		file = path.toFile();
+							try(FileOutputStream outputStream = new FileOutputStream(file);){
+		            			outputStream.write(inputBuffer.toString().trim().getBytes());
+		            		}
+		            	}
+		            case 1:
+		            	uploadFile(file);
+		            	break;
+		            default:
+		            	return;
+		            }
+		        } catch (Exception ex) {
+		            ex.printStackTrace();
+		        }
+			}
+
+			private String getNewSerialNumber(boolean converter) {
+
+				Calendar calendar = Calendar.getInstance();
+				String newFileName = Integer.toString(calendar.get(Calendar.YEAR)).substring(2);
+				newFileName += String.format("%02d", calendar.get(Calendar.WEEK_OF_YEAR));
+
+				try {
+					String fn = newFileName;
+					int sequence = Files.walk(Paths.get("Z:\\4alex\\boards\\profile"))
+							.filter(Files::isRegularFile)
+							.map(Path::getFileName)
+							.map(Path::toString)
+							.map(fileName->fileName.toUpperCase().replace(".BIN", ""))
+							.filter(fileName->converter ? fileName.endsWith("C") : true)
+							.map(fileName->fileName.replaceAll("\\D", ""))
+							.filter(fileName->fileName.startsWith(fn))
+							.map(fileName->fileName.replace(fn, ""))
+							.mapToInt(Integer::parseInt)
+							.max()
+							.orElse(0);
+
+					newFileName += String.format("%03d", ++sequence);
+					if(converter)
+						newFileName += 'C';
+
+					return "IRT-" + newFileName;
+
+				} catch (IOException e) {
+					logger.catching(e);
+				}
+				return null;
+			}
+
+			private int getDeviceType(BufferedReader br, StringBuffer inputBuffer) throws IOException {
+				String line;
+				while ((line = br.readLine()) != null) {
+					inputBuffer.append(line);
+					inputBuffer.append('\n');
+					if(line.startsWith("device-type")) {
+						final String type = line.replaceAll("\\D", "");
+						if(type.isEmpty())
+							return -1;
+						else
+							return Integer.parseInt(type);
+					}
+				}
+				return -1;
+			}
+
+			private void setSerialNumber(String newSN, BufferedReader br, StringBuffer inputBuffer) throws IOException {
+				String line;
+				while ((line = br.readLine()) != null) {
+					final boolean startsWith = line.startsWith("device-serial-number");
+					if(startsWith) line = "device-serial-number " + newSN;
+					inputBuffer.append(line);
+					inputBuffer.append('\n');
+					if(startsWith) return;
+				}
+			}
+
+			private void setLockType(int lockType, BufferedReader br, StringBuffer inputBuffer) throws IOException {
+				String line;
+				while ((line = br.readLine()) != null) {
+					final boolean startsWith = line.startsWith("reference-clock-source");
+					if(startsWith) {
+						line = String.format("reference-clock-source %d	# 0: as default in SW; 1: Internal; 2: External; 3: Auto", lockType);
+						inputBuffer.append(line);
+						inputBuffer.append('\n');
+						lockType *= 2;
+						if(lockType>4)
+							lockType = 8;
+						line = String.format("reference-clock-config-capabilities  %d 	# Bitmask [0]: Undefined; [1]: Internal; [2]: External; [3]: Autosense", lockType);
+					}
+					inputBuffer.append(line);
+					inputBuffer.append('\n');
+					if(startsWith) return;
+				}
+			}
+
+			private void removeClockCapabilities(BufferedReader br, StringBuffer inputBuffer) throws IOException {
+				String line;
+				while ((line = br.readLine()) != null) {
+					if(line.startsWith("reference-clock-config-capabilities"))
+						return;
+					inputBuffer.append(line);
+					inputBuffer.append('\n');
+				}
+			}
+
+			private void fillBuffer(BufferedReader br, StringBuffer inputBuffer) throws IOException {
+				String line;
+				while ((line = br.readLine()) != null) {
+					inputBuffer.append(line);
+					inputBuffer.append('\n');
+				}
+			}
+	});
 
 		popupMenu = new JPopupMenu();
 		addPopup(textPane, popupMenu);
@@ -818,72 +1024,84 @@ public class ConnectionPanel extends JPanel implements Observer {
 				if (fc.showDialog(ConnectionPanel.this, "Upload") == JFileChooser.APPROVE_OPTION) {
 					File file = fc.getSelectedFile();
 
-					StringBuffer fileContents = new StringBuffer();
-					final ProfileParser profileParser = new ProfileParser();
+					if(!uploadFile(file))
+						return;
 
-					try (Scanner scanner = new Scanner(file)) {
-						while (scanner.hasNextLine()){
-							final String trim = scanner.nextLine().trim();
-							fileContents.append(trim).append("\n");
-							profileParser.append(trim);
-						}
+					String path = file.getAbsolutePath();
+					if (p == null || !path.equals(pathStr)) {
+						prefs.put(key, path);
 					}
 
-					if (fileContents.length()>0) {
-
-						int deviceType = profileParser.getDeviceType();
-
-						if (deviceType >= 0) {
-
-							boolean bais = deviceType < 1000;
-
-							logger.debug("deviceType={}, bais={}", deviceType, bais);
-
-							boolean upload = true;
-
-							if ((selectedUnitType.equals(Address.CONVERTER.toString()) && bais) || (selectedUnitType.equals(Address.BIAS.toString()) && !bais)) {
-
-								String message = "Selected Profile is created for "
-										+ (bais ? Address.BIAS.toString() : Address.CONVERTER.toString())
-										+ "\nbut selected 'Unit Type' is " + selectedUnitType
-										+ ".\n\nTo continue press 'OK' button.\n";
-
-								upload = JOptionPane.showConfirmDialog(ConnectionPanel.this, message, "Warning", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION;
-							}
-
-							if(upload && profileParser.hasError()){
-								
-								String message = "The profile has error(s):\n"
-										+ profileParser.getReports()
-										+ ".\n\nTo continue press 'OK' button.\n";
-
-								upload = JOptionPane.showConfirmDialog(ConnectionPanel.this, message, "Profile ERROR", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION;
-							}
-
-							if (upload) {
-
-								String path = file.getAbsolutePath();
-								if (p == null || !path.equals(pathStr)) {
-									prefs.put(key, path);
-								}
-
-// Signature
-								fileContents
-								.append("\n#Uploaded by STM32 on ")
-								.append(new Timestamp(new Date().getTime()))
-								.append(" from ")
-								.append(InetAddress.getLocalHost().getHostName())
-								.append(" computer.")
-								.append('\0');
-
-								MicrocontrollerSTM32.writeProfile((String) selectedUnitType, fileContents.toString());
-							}
-						} else
-							JOptionPane.showMessageDialog(ConnectionPanel.this, "Profile is missing 'DEVICE TYPE'");
-					}
 				}
 			}
 		}.execute();
+	}
+
+	private boolean uploadFile(File file) throws FileNotFoundException, UnknownHostException, InterruptedException {
+
+		StringBuffer fileContents = new StringBuffer();
+		final ProfileParser profileParser = new ProfileParser();
+
+		try (Scanner scanner = new Scanner(file)) {
+			while (scanner.hasNextLine()){
+				final String trim = scanner.nextLine().trim();
+				fileContents.append(trim).append("\n");
+				profileParser.append(trim);
+			}
+		}
+
+		// return  if file is empty
+		if (fileContents.length()==0)
+			return false;
+
+		int deviceType = profileParser.getDeviceType();
+
+		if (deviceType >= 0) {
+
+			boolean bais = deviceType < 1000;
+
+			logger.debug("deviceType={}, bais={}", deviceType, bais);
+
+			boolean upload = true;
+
+			Object selectedUnitType = comboBoxUnitType.getSelectedItem();
+			if ((selectedUnitType.equals(Address.CONVERTER.toString()) && bais) || (selectedUnitType.equals(Address.BIAS.toString()) && !bais)) {
+
+				String message = "Selected Profile is created for "
+							+ (bais ? Address.BIAS.toString() : Address.CONVERTER.toString())
+							+ "\nbut selected 'Unit Type' is " + selectedUnitType
+							+ ".\n\nTo continue press 'OK' button.\n";
+
+				upload = JOptionPane.showConfirmDialog(ConnectionPanel.this, message, "Warning", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION;
+			}
+
+			if(upload && profileParser.hasError()){
+					
+				String message = "The profile has error(s):\n"
+							+ profileParser.getReports()
+							+ ".\n\nTo continue press 'OK' button.\n";
+
+				upload = JOptionPane.showConfirmDialog(ConnectionPanel.this, message, "Profile ERROR", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION;
+			}
+
+			if (upload) {
+
+//Signature
+				fileContents
+					.append("\n#Uploaded by STM32 on ")
+					.append(new Timestamp(new Date().getTime()))
+					.append(" from ")
+					.append(InetAddress.getLocalHost().getHostName())
+					.append(" computer.")
+					.append('\0');
+
+				MicrocontrollerSTM32.writeProfile((String) selectedUnitType, fileContents.toString());
+				return true;
+			}
+		} else {
+			JOptionPane.showMessageDialog(ConnectionPanel.this, "Profile is missing 'DEVICE TYPE'");
+		}
+		return false;
 	}
 
 	//	*************************************************************************
@@ -1029,23 +1247,19 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 		private void setTextPaneText(final byte[] readBytes) {
 
-			new SwingWorker<Void, Void>() {
-
-				@Override
-				protected Void doInBackground() throws Exception {
-					setName("setTextPaneText(final byte[] readBytes)");
-					logger.debug(readBytes);
-					if (readBytes != null) {
-						String string = new String(readBytes);
-						textPane.setText(string);
-						textPane.setForeground(Color.BLACK);
-					} else {
-						textPane.setText(comboBoxUnitType.getSelectedItem() + " does not have a Profile.");
-						textPane.setForeground(Color.RED);
-					}
-					return null;
-				}
-			}.execute();
+			SwingUtilities.invokeLater(
+					()->{
+						setName("setTextPaneText(final byte[] readBytes)");
+						logger.debug(readBytes);
+						if (readBytes != null) {
+							String string = new String(readBytes);
+							textPane.setText(string);
+							textPane.setForeground(Color.BLACK);
+						} else {
+							textPane.setText(comboBoxUnitType.getSelectedItem() + " does not have a Profile.");
+							textPane.setForeground(Color.RED);
+						}
+					});
 
 			dialog.setMessage(null);
 		}

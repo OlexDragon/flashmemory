@@ -10,6 +10,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 public class Flash3App extends Application {
@@ -34,6 +35,7 @@ public class Flash3App extends Application {
 	public void start(Stage stage) throws Exception {
 
 		Flash3App.stage = stage;
+		stage.getIcons().add(new Image(getClass().getResourceAsStream("/images/flash.png")));
 
 		String fxmlFile = "/fxml/Flash.fxml";
         FXMLLoader loader = new FXMLLoader();

@@ -18,26 +18,26 @@ public class FlashWorkerTest {
 		assertEquals(4, pagesToErase.length);
 		assertEquals(0, pagesToErase[0]);
 		assertEquals(0, pagesToErase[1]);
-		assertEquals(10, pagesToErase[2]);
-		assertEquals(0, pagesToErase[3]);
+		assertEquals(0, pagesToErase[2]);
+		assertEquals(10, pagesToErase[3]);
 
 		pagesToErase = FlashWorker.getPagesToExtendedErase(UnitAddress.BIAS.getAddr(), 1 * FlashWorker.KB);
 		System.out.println(Arrays.toString(pagesToErase));
 		assertEquals(4, pagesToErase.length);
 		assertEquals(0, pagesToErase[0]);
 		assertEquals(0, pagesToErase[1]);
-		assertEquals(11, pagesToErase[2]);
-		assertEquals(0, pagesToErase[3]);
+		assertEquals(0, pagesToErase[2]);
+		assertEquals(11, pagesToErase[3]);
 
 		pagesToErase = FlashWorker.getPagesToExtendedErase(UnitAddress.BIAS.getAddr(), 129 * FlashWorker.KB);
 		System.out.println(Arrays.toString(pagesToErase));
 		assertEquals(6, pagesToErase.length);
-		assertEquals(1, pagesToErase[0]);
-		assertEquals(0, pagesToErase[1]);
-		assertEquals(11, pagesToErase[2]);
-		assertEquals(0, pagesToErase[3]);
-		assertEquals(12, pagesToErase[4]);
-		assertEquals(0, pagesToErase[5]);
+		assertEquals(0, pagesToErase[0]);
+		assertEquals(1, pagesToErase[1]);
+		assertEquals(0, pagesToErase[2]);
+		assertEquals(11, pagesToErase[3]);
+		assertEquals(0, pagesToErase[4]);
+		assertEquals(12, pagesToErase[5]);
 	}
 
 	@Test

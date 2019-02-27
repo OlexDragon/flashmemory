@@ -15,6 +15,7 @@ import irt.flash.FlashController;
 import irt.flash.data.FlashAnswer;
 import irt.flash.data.FlashCommand;
 import irt.flash.data.UnitAddress;
+import javafx.scene.control.Alert.AlertType;
 import jssc.SerialPort;
 import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
@@ -73,10 +74,12 @@ public class FlashWorker {
 	public static Optional<FlashAnswer> erase(SerialPort serialPort, int startAddress, int length) throws IOException, SerialPortException, SerialPortTimeoutException {
 
 		final byte[] pagesToErase = getPagesToExtendedErase(startAddress, length);
-		logger.info("startAddress: 0x{}, length: {}, pagesToErase: {}", ()->Integer.toHexString(startAddress), ()->length, ()->pagesToErase);
+		final short pages = ByteBuffer.allocate(2).put(pagesToErase[0]).put(pagesToErase[1]).getShort(0);
+		int numberOfPagies = pages + 1;
+		int timaout = numberOfPagies * 3000;
 
-		byte numberOfPagies = pagesToErase[0];
-		int timaout = ++numberOfPagies * 3000;
+		logger.info("startAddress: 0x{}, length: {}, pages: {}, timeout: {}, pagesToErase: {}", Integer.toHexString(startAddress), length, numberOfPagies, timaout, pagesToErase);
+
 
 		final Optional<byte[]> addCheckSum = addCheckSum(pagesToErase);
 
@@ -133,15 +136,15 @@ public class FlashWorker {
 			// Stop the process, too many attempts.
 			if(count++>7) {
 				count = 0;
-				FlashController.showAlert("A lot of wrong answers");
+				FlashController.showAlert("A lot of wrong answers", AlertType.ERROR);
 				return Optional.empty();
 			}
 
-			FlashController.showAlert("Aswer is wrong: 0x" + DatatypeConverter.printHexBinary(new byte[] {readByte}));
+			FlashController.showAlert("Aswer is wrong: 0x" + DatatypeConverter.printHexBinary(new byte[] {readByte}), AlertType.ERROR);
 			// Trying to get the right answer again.
 			return waitForACK(serialPort, timeout);
 		}else
-			oFlashAnswer.filter(a->a!=FlashAnswer.ACK).ifPresent(a->FlashController.showAlert("Aswer is " + a));
+			oFlashAnswer.filter(a->a!=FlashAnswer.ACK).ifPresent(a->FlashController.showAlert("Aswer is " + a, AlertType.ERROR));
 
 		count = 0;
 		return oFlashAnswer;
@@ -180,7 +183,7 @@ public class FlashWorker {
 
 			final String message = "Can not send bytes: " + DatatypeConverter.printHexBinary(bytes);
 			logger.debug(message);
-			FlashController.showAlert(message);
+			FlashController.showAlert(message, AlertType.ERROR);
 			return Optional.empty();
 		}
 

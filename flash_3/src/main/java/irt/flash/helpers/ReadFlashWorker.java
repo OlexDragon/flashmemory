@@ -16,6 +16,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.SingleSelectionModel;
+import javafx.scene.control.Alert.AlertType;
 import javafx.util.StringConverter;
 import jssc.SerialPort;
 import jssc.SerialPortException;
@@ -80,7 +81,7 @@ public class ReadFlashWorker {
 			if(serialPort == null || !serialPort.isOpened()) {
 				final String message = "Unit is not connected.";
 				logger.debug(message);
-				FlashController.showAlert(message);
+				FlashController.showAlert(message, AlertType.ERROR);
 				return;
 			}
 
@@ -96,7 +97,7 @@ public class ReadFlashWorker {
 				logger.catching(e);
 			} catch (SerialPortTimeoutException e) {
 				logger.catching(Level.DEBUG, e);
-				FlashController.showAlert("Connection timeout");
+				FlashController.showAlert("Connection timeout", AlertType.ERROR);
 			}
 	}
 
@@ -141,7 +142,7 @@ public class ReadFlashWorker {
 						logger.catching(e);
 					} catch (SerialPortTimeoutException e) {
 						logger.catching(Level.DEBUG, e);
-						FlashController.showAlert("Connection timeout");
+						FlashController.showAlert("Connection timeout", AlertType.ERROR);
 					}
 				});
 	}
@@ -155,7 +156,7 @@ public class ReadFlashWorker {
 			logger.catching(e);
 		} catch ( SerialPortTimeoutException e) {
 			logger.catching(Level.DEBUG, e);
-			FlashController.showAlert("Connection timeout");
+			FlashController.showAlert("Connection timeout", AlertType.ERROR);
 		}
 		return Optional.empty();
 	}
@@ -170,7 +171,7 @@ public class ReadFlashWorker {
 			logger.catching(e);
 		} catch (SerialPortTimeoutException e) {
 			logger.catching(Level.DEBUG, e);
-			FlashController.showAlert("Connection timeout");
+			FlashController.showAlert("Connection timeout", AlertType.ERROR);
 		}
 		return Optional.empty();
 	}

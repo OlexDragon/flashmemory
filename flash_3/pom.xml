@@ -5,8 +5,8 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>irt</groupId>
-	<artifactId>flash.converter</artifactId>
-	<name>flash.converter</name>
+	<artifactId>flash</artifactId>
+	<name>flash</name>
 
 	<packaging>jar</packaging>
 	<version>3.0.1</version>
@@ -17,7 +17,7 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<mainClass>irt.gui.IrtGuiApp</mainClass>
+		<mainClass>irt.flash.Flash3App</mainClass>
 	</properties>
 
 	<dependencies>

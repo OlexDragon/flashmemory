@@ -7,7 +7,6 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.prefs.Preferences;
@@ -35,7 +34,7 @@ public class DeviceWorker {
 
 	private static File defaultDirectory; public static File getDefaultDirectory() { return defaultDirectory; }
 
-	public DeviceWorker(ChoiceBox<String> chbDeviceGroup, ChoiceBox<String> chbDeviceType, TextArea txtArea) throws IOException {
+	public DeviceWorker(TextArea txtArea) throws IOException {
 
 		this.txtArea = txtArea;
 
@@ -59,39 +58,28 @@ public class DeviceWorker {
 						}
 
 						prefs.put(DEFAULT_TEMPLATE_S_PATH, defaultDirectory.toString());
-
-						ThreadWorker.runThread(()->fillDeviceGroup(chbDeviceGroup, chbDeviceType));
 					});
 			return;
 		}
-
-		fillDeviceGroup(chbDeviceGroup, chbDeviceType);
 	}
 
-	private void fillDeviceGroup(ChoiceBox<String> chbDeviceGroup, ChoiceBox<String> chbDeviceType) {
+	public static void fillDeviceGroup(ChoiceBox<File> chbDeviceGroup, ChoiceBox<File> chbDeviceType) {
 
 		Optional.of(defaultDirectory.listFiles(File::isDirectory))
 		.filter(l->l.length>0)
-		.map(
-				l->Arrays.stream(l)
-				.map(File::getName)
-				.toArray(String[]::new))
 		.map(FXCollections::observableArrayList)
 		.ifPresent(oal->Platform.runLater(()->chbDeviceGroup.setItems(oal)));
 
 		chbDeviceGroup.getSelectionModel().selectedItemProperty().addListener(
 				e->{
-					Optional.ofNullable((String) ((ReadOnlyObjectProperty<?>)e).getValue())
-					.map(group->new File(defaultDirectory, group))
+
+					chbDeviceType.getItems().clear();
+
+					final File value = (File) ((ReadOnlyObjectProperty<?>)e).getValue();
+
+					Optional.ofNullable(value)
 					.map(dir->dir.listFiles(((d, n) -> n.toLowerCase().endsWith(".bin"))))
 					.filter(l->l.length>0)
-					.map(
-							l->Arrays.stream(l)
-							.map(File::getName)
-							.map(n->n.substring(0, n.length()-4))
-							.sorted()
-							.toArray(String[]::new))
-
 					.map(FXCollections::observableArrayList)
 					.ifPresent(oal->Platform.runLater(()->chbDeviceType.setItems(oal)));
 				});
@@ -102,6 +90,10 @@ public class DeviceWorker {
 
 		int length = getProfileLength(bytes);
 
+		if(length==0) {
+			ProfileWorker.showConfirmationDialog();
+			return;
+		}
 		final String string = new String(bytes, 0, length);
 
 		Platform.runLater(()->txtArea.setText(string));
@@ -187,5 +179,4 @@ public class DeviceWorker {
 	public void setUploadWorker(UploadWorker uploadWorker) {
 		this.uploadWorker = uploadWorker;
 	}
-
 }

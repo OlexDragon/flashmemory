@@ -3,6 +3,8 @@
 <?import javafx.scene.Cursor?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.ContextMenu?>
+<?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.layout.AnchorPane?>
@@ -15,15 +17,20 @@
          <top>
             <HBox spacing="5.0" BorderPane.alignment="CENTER">
                <children>
-                  <ChoiceBox fx:id="chbPorts" />
+                  <ChoiceBox fx:id="chbPorts">
+                     <contextMenu>
+                        <ContextMenu>
+                          <items>
+                              <MenuItem mnemonicParsing="false" onAction="#onBaudRate" text="Baud Rate" />
+                          </items>
+                        </ContextMenu>
+                     </contextMenu></ChoiceBox>
                   <Button fx:id="btnConnect" disable="true" mnemonicParsing="false" onAction="#onConnect" text="Connect">
                      <cursor>
                         <Cursor fx:constant="HAND" />
                      </cursor></Button>
                   <ChoiceBox fx:id="chbRead" disable="true" />
                   <ChoiceBox fx:id="chbUpload" disable="true" />
-                  <ChoiceBox fx:id="chbDeviceGroup" disable="true" />
-                  <ChoiceBox fx:id="chbDeviceType" disable="true" />
                </children>
             </HBox>
          </top>

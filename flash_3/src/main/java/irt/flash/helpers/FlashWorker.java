@@ -38,13 +38,12 @@ public class FlashWorker {
 	public static byte[] getPagesToExtendedErase(int startAddress, int length) throws IOException {
 
 		int stopAddress = startAddress + length;
-		byte[] result;
+		int sum = UnitAddress.PROGRAM.getAddr();	//Start address
 
 		try(ByteArrayOutputStream outputStream = new ByteArrayOutputStream()){
 			outputStream.write(0);	// The bootloader receives one half-word (two bytes) that contain N, the number of pages to be erased
 			outputStream.write(0);
 
-			int sum = UnitAddress.PROGRAM.getAddr();	//Start address
 
 			for(int page = 0; page<ALL_PAGES.length && sum<stopAddress; page++) {
 
@@ -57,14 +56,14 @@ public class FlashWorker {
 				sum += ALL_PAGES[page];
 			}
 
-			result = outputStream.toByteArray();
+			final byte[] result = outputStream.toByteArray();
 			final int pages = result.length/2 - 2;
 			final byte[] arrayPages = toBytes((short) pages);
 			result[0] = arrayPages[0]; // the number of pages to be erased –1.
 			result[1] = arrayPages[1]; 
-		}
 
-		return result;
+			return result;
+		}
 	}
 
 	private static byte[] toBytes(final short pages) {

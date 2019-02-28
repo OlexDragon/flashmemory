@@ -46,7 +46,8 @@ public class ComPortWorker {
 		Optional.ofNullable(prefs.get("Selected Serial Port", null)).ifPresent(
 				portName->{
 					selectionModel.select(portName);
-					btnConnect.setDisable(selectionModel.getSelectedIndex()<0);
+					final int selectedIndex = selectionModel.getSelectedIndex();
+					btnConnect.setDisable(selectedIndex<0);
 				});
 
 		selectionModel.selectedItemProperty().addListener(
@@ -56,7 +57,7 @@ public class ComPortWorker {
 				});
 	}
 
-	public Optional<SerialPort> conect() throws SerialPortException{
+	public Optional<SerialPort> conect(int baudRate) throws SerialPortException{
 
 		if(closeComPort().isPresent()) 
      		return Optional.empty();
@@ -65,7 +66,7 @@ public class ComPortWorker {
 
 		final SerialPort serialPort = new SerialPort(portName);
 		if(serialPort.openPort()) {
-			serialPort.setParams(SerialPort.BAUDRATE_115200, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_EVEN);
+			serialPort.setParams(baudRate, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_EVEN);
 			btnConnect.setText("Disconnect");
 			btnConnect.setTooltip(new Tooltip(serialPort.getPortName()));
 			chbPorts.setUserData(serialPort);

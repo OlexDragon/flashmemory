@@ -44,7 +44,7 @@ public class Flash3App extends Application {
         Scene scene = new Scene(rootNode);
         scene.getStylesheets().add("/styles/styles.css");
 
-        stage.setTitle("Flash Converter v " + version);
+        stage.setTitle("Flash v " + version);
         stage.setScene(scene);
         size.setStageProperties(stage);
         stage.show();

@@ -1,6 +1,8 @@
 package irt.flash;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import javax.xml.bind.DatatypeConverter;
@@ -15,23 +17,28 @@ import irt.flash.data.UnitAddress;
 import irt.flash.helpers.ComPortWorker;
 import irt.flash.helpers.DeviceWorker;
 import irt.flash.helpers.FlashWorker;
+import irt.flash.helpers.ProfileWorker;
 import irt.flash.helpers.ReadFlashWorker;
 import irt.flash.helpers.UploadWorker;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
-import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
+import javafx.util.Pair;
+import jssc.SerialPort;
 import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
 
@@ -44,36 +51,65 @@ public class FlashController {
 	@FXML private ChoiceBox<String> chbPorts;
     @FXML private ChoiceBox<UnitAddress> chbRead;
     @FXML private ChoiceBox<Object> chbUpload;
-    @FXML private ChoiceBox<String> chbDeviceGroup;
-    @FXML private ChoiceBox<String> chbDeviceType;
     @FXML private TextArea txtArea;
 
+    private static Node node;
     private static FlashController controller;
 
-    private ComPortWorker comPortWorker;
+    private ComPortWorker	 comPortWorker;
 	private Optional<byte[]> controllerID;
-	private ReadFlashWorker readFlashWorker;
-	private UploadWorker uploadWorker;
+	private ReadFlashWorker	 readFlashWorker;
+	private UploadWorker	 uploadWorker;
+	private static int baudRate = SerialPort.BAUDRATE_115200;
 
     @FXML void initialize() throws IOException {
     	controller = this;
+    	node = btnConnect;
 
     	comPortWorker = new ComPortWorker(chbPorts, btnConnect);
     	readFlashWorker = new ReadFlashWorker(chbRead);
 
-    	uploadWorker = new UploadWorker(chbUpload);
-    	readFlashWorker.setUploadWorker(uploadWorker);
-
-    	final DeviceWorker deviceWorker = new DeviceWorker(chbDeviceGroup, chbDeviceType, txtArea);
+    	final DeviceWorker deviceWorker = new DeviceWorker(txtArea);
         readFlashWorker.setDeviceWorker(deviceWorker);
 
+    	uploadWorker = new UploadWorker(chbUpload);
+    	readFlashWorker.setUploadWorker(uploadWorker);
     	deviceWorker.setUploadWorker(uploadWorker);
+
+    	new ProfileWorker(btnConnect);
+    }
+
+    @FXML
+    void onBaudRate() {
+    	List<Integer> choices = new ArrayList<>();
+       	choices.add(SerialPort.BAUDRATE_110);
+       	choices.add(SerialPort.BAUDRATE_300);
+       	choices.add(SerialPort.BAUDRATE_600);
+       	choices.add(SerialPort.BAUDRATE_1200);
+       	choices.add(SerialPort.BAUDRATE_4800);
+       	choices.add(SerialPort.BAUDRATE_9600);
+       	choices.add(SerialPort.BAUDRATE_14400);
+       	choices.add(SerialPort.BAUDRATE_19200);
+       	choices.add(SerialPort.BAUDRATE_38400);
+       	choices.add(SerialPort.BAUDRATE_57600);
+		choices.add(SerialPort.BAUDRATE_115200);
+       	choices.add(SerialPort.BAUDRATE_128000);
+       	choices.add(SerialPort.BAUDRATE_256000);
+
+    	ChoiceDialog<Integer> dialog = new ChoiceDialog<>(baudRate, choices);
+		Optional.ofNullable(node).map(Node::getScene).map(Scene::getWindow).ifPresent(dialog::initOwner);
+    	dialog.setTitle("Choice Dialog");
+    	dialog.setHeaderText(null);
+    	dialog.setContentText("Choice Baud Rate");
+
+     	dialog.showAndWait()
+     	.ifPresent(v->baudRate=v);
     }
 
     @FXML void onConnect(){
     	try {
 
-			final Boolean setDisable = comPortWorker.conect()
+			final Boolean setDisable = comPortWorker.conect(baudRate )
 
 					.map(
 							sp->{
@@ -125,8 +161,6 @@ public class FlashController {
 	void setDisable(boolean value) {
 		chbRead.setDisable(value);
 		chbUpload.setDisable(value);
-		chbDeviceGroup.setDisable(value);
-		chbDeviceType.setDisable(value);
 	}
 
 	public static void disable(final boolean value) {
@@ -141,6 +175,7 @@ public class FlashController {
 					()->{
 
 						alert = new Alert(alertType);
+						Optional.ofNullable(node).map(Node::getScene).map(Scene::getWindow).ifPresent(alert::initOwner);
 						alert.setTitle("Connection error.");
 						alert.setHeaderText(null);
 						alert.setContentText(message);
@@ -167,6 +202,7 @@ public class FlashController {
 						progressBarDialog = new Dialog<>();
 
 						final DialogPane dialogPane = progressBarDialog.getDialogPane();
+						Optional.ofNullable(node).map(Node::getScene).map(Scene::getWindow).ifPresent(progressBarDialog::initOwner);
 						dialogPane.setMinHeight(200);
 						dialogPane.setMinWidth(200);
 						Stage stage = (Stage) dialogPane.getScene().getWindow();

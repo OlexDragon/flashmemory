@@ -26,7 +26,7 @@
     -fx-background-image: url("../images/background.jpg");
 }
 
-.hello-message {
+.message {
     -fx-text-fill: #AA0000;
     -fx-font-weight: bold;
     -fx-effect: dropshadow( gaussian , rgba(255,255,255,0.5) , 0,0,0,1 );

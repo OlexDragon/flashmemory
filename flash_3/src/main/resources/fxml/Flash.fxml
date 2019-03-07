@@ -37,7 +37,7 @@
          <center>
             <ScrollPane fitToHeight="true" fitToWidth="true" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308">
               <content>
-                  <TextArea fx:id="txtArea" editable="false" focusTraversable="false" promptText="No Data" />
+                  <TextArea fx:id="txtArea" editable="false" focusTraversable="false" onDragDropped="#onDragDropped" onDragOver="#onDragOwer" promptText="No Data" />
               </content>
             </ScrollPane>
          </center>

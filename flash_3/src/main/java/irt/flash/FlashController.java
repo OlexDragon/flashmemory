@@ -35,9 +35,13 @@ import javafx.scene.control.DialogPane;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
-import javafx.util.Pair;
 import jssc.SerialPort;
 import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
@@ -76,7 +80,8 @@ public class FlashController {
     	readFlashWorker.setUploadWorker(uploadWorker);
     	deviceWorker.setUploadWorker(uploadWorker);
 
-    	new ProfileWorker(btnConnect);
+    	final ProfileWorker profileWorker = new ProfileWorker(btnConnect);
+    	profileWorker.setUploadWorker(uploadWorker);
     }
 
     @FXML
@@ -158,6 +163,32 @@ public class FlashController {
 		}
     }
 
+    @FXML void onDragOwer(DragEvent event) {
+
+    	Optional.of(chbRead).filter(cb->!cb.isDisabled())
+    	.map(cb->event.getDragboard())
+    	.filter(Dragboard::hasFiles)
+    	.map(Dragboard::getFiles)
+    	.filter(l->l.size()==1)
+    	.map(l->l.get(0))
+    	.filter(f->f.getName().toLowerCase().endsWith(".bin"))
+    	.ifPresent(db->event.acceptTransferModes(TransferMode.LINK));
+    	event.consume();
+    }
+
+    @FXML
+    void onDragDropped(DragEvent event) {
+
+    	logger.error(event);
+    	Optional.of(event.getDragboard())
+    	.map(Dragboard::getFiles)
+    	.map(l->l.get(0))
+    	.ifPresent(f->uploadWorker.uplodeToTheFlash(f.toPath()));
+
+    	event.setDropCompleted(true);
+    	event.consume();
+    }
+
 	void setDisable(boolean value) {
 		chbRead.setDisable(value);
 		chbUpload.setDisable(value);
@@ -237,5 +268,20 @@ public class FlashController {
 					d.close();
 					progressBarDialog = null;
 					progressBar = null;}));
+	}
+
+	public void setGlobalOnKeyTyped() {
+		btnConnect.getScene().setOnKeyReleased(
+				e->{
+
+					Optional.of(e)
+					.filter(KeyEvent::isShortcutDown)
+					.filter(v->v.getCode()==KeyCode.C)
+					.map(v->txtArea.getSelection())
+					.filter(s->s.getStart()==s.getEnd())
+					.ifPresent(
+							s->{
+								btnConnect.fire();
+								e.consume(); }); }); 
 	}
 }

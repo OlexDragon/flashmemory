@@ -7,6 +7,7 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import irt.flash.Flash3App;
 import irt.flash.FlashController;
 import irt.flash.data.FlashAnswer;
 import irt.flash.data.FlashCommand;
@@ -51,7 +52,7 @@ public class ReadFlashWorker {
 						.map(UnitAddress::toString)
 						.orElse("Read ...");
 			}
-			
+
 			@Override public UnitAddress fromString(String string) { return null; }
 		});
 		chbRead.setItems(observableArrayList);
@@ -77,6 +78,7 @@ public class ReadFlashWorker {
 
 			// share the UnitAddresst with uploadWorker
 			uploadWorker.setUnitAddress(unitAddress);
+			Flash3App.setUnitType(unitAddress.name());
 
 			if(serialPort == null || !serialPort.isOpened()) {
 				final String message = "Unit is not connected.";

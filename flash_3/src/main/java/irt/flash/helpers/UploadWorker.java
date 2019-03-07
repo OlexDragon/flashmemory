@@ -37,6 +37,7 @@ import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.SelectionModel;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SingleSelectionModel;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
@@ -66,7 +67,7 @@ public class UploadWorker {
 		this.chbUpload= chbUpload;
 		prefs = Preferences.userNodeForPackage(getClass());
 
-		list = FXCollections.observableArrayList("Upload ...", otherProfile, otherProgram);
+		list = FXCollections.observableArrayList("Upload ...", otherProfile, new SeparatorMenuItem(), otherProgram);
 		program.setUnitAddress(UnitAddress.PROGRAM);
 		otherProgram.setUnitAddress(UnitAddress.PROGRAM);
 
@@ -95,58 +96,10 @@ public class UploadWorker {
 						Optional.ofNullable(getUnitAddress(pathHolder)).ifPresent(
 
 								unitAddress->{
-									
+
 									final Path path = getPath(pathHolder, unitAddress);
 									logger.info("File to upload: {}", path);
-									Optional.ofNullable(path).ifPresent(
-											p->{
-
-												try {
-
-													final byte[] fileAsBytes = Files.readAllBytes(p);
-
-													//Add signature to the end of the file.
-													Properties properties = new Properties();
-													properties.load(getClass().getResourceAsStream("/project.properties"));
-													String version = properties.getProperty("version");
-													final byte[] signature = new StringBuffer()
-
-															.append("\n#Uploaded by Flash v")
-															.append(version)
-															.append(" on ")
-															.append(new Timestamp(new Date().getTime()))
-															.append(" from ")
-															.append(InetAddress.getLocalHost().getHostName())
-															.append(" computer.")
-															.toString()
-															.getBytes();
-
-													//	size should always be a multiple of 4.
-													int size = fileAsBytes.length + signature.length;
-													int sizeToWrite = Optional.of(size % 4).filter(modulus->modulus>0).map(modulus->size + modulus).orElse(size);
-													logger.error("sizeToWrite: {}", sizeToWrite);
-
-													byte[] arrayToSend = ByteBuffer
-
-															.allocate(sizeToWrite)
-															.put(fileAsBytes)
-															.put(signature)
-															.array();
-
-													FlashController.showAlert("Erasing Flash Memory.", AlertType.INFORMATION);
-													final boolean erased = FlashWorker.erase(serialPort, unitAddress.getAddr(), arrayToSend.length).filter(answer->answer==FlashAnswer.ACK).isPresent();
-													FlashController.closeAlert();
-
-													if(erased)
-														writeToFlash(arrayToSend, unitAddress.getAddr() , 0);
-
-												} catch (IOException | SerialPortException e) {
-													logger.catching(e);
-												} catch (SerialPortTimeoutException e) {
-													logger.catching(Level.DEBUG, e);
-													FlashController.showAlert("Connection timeout", AlertType.ERROR);
-												}});
-
+									uplodeToTheFlash(unitAddress, path);
 								});
 
 						FlashController.disable(false);
@@ -154,6 +107,105 @@ public class UploadWorker {
 						Platform.runLater(()->selectionModel.select(0));
 					});
 				});
+	}
+
+	public void uplodeToTheFlash(final Path path) {
+		ThreadWorker.runThread(()->{
+
+			FutureTask<UnitAddress> ft = new FutureTask<UnitAddress>(
+					()->{
+						Alert alert = new Alert(AlertType.CONFIRMATION);
+						alert.setTitle("Select the Unit Type");
+						alert.setHeaderText(null);
+						alert.setContentText("Choose your option.");
+
+						List<ButtonType> buttons = new ArrayList<>();
+						final UnitAddress[] values = UnitAddress.values();
+						for(int i=0; i<values.length; i++)
+							buttons.add(new ButtonType(values[i].name()));
+						buttons.add(new ButtonType("Cancel", ButtonData.CANCEL_CLOSE));
+
+						alert.getButtonTypes().setAll(buttons);
+
+						return alert.showAndWait()
+
+								.filter(b->b.getButtonData()!=ButtonData.CANCEL_CLOSE)
+								.map(ButtonType::getText)
+								.map(UnitAddress::valueOf)
+								.orElse(null);});
+			try {
+
+				Platform.runLater(ft);
+				final UnitAddress unitAddress = ft.get();
+				uplodeToTheFlash(unitAddress, path);
+
+			} catch (InterruptedException | ExecutionException e) {
+				logger.catching(e);
+			}
+		});
+	}
+
+	public void uplodeToTheFlash(UnitAddress unitAddress, final Path path) {
+		logger.entry(unitAddress, path);
+
+		Optional.ofNullable(path).ifPresent(
+				p->{
+
+					try {
+
+						final byte[] fileAsBytes = Files.readAllBytes(p);
+
+						//Add signature to the end of the file.
+						Properties properties = new Properties();
+						properties.load(getClass().getResourceAsStream("/project.properties"));
+						String version = properties.getProperty("version");
+						final byte[] signature = new StringBuffer()
+
+								.append("\n#Uploaded by Flash v")
+								.append(version)
+								.append(" on ")
+								.append(new Timestamp(new Date().getTime()))
+								.append(" from ")
+								.append(InetAddress.getLocalHost().getHostName())
+								.append(" computer.")
+								.toString()
+								.getBytes();
+
+						logger.debug("signature: {}", signature);
+
+						//	size should always be a multiple of 4.
+						int size = fileAsBytes.length + signature.length;
+						int sizeToWrite = Optional.of(size % 4).filter(modulus->modulus>0).map(modulus->size + modulus).orElse(size);
+
+						byte[] arrayToSend = ByteBuffer
+
+								.allocate(sizeToWrite)
+								.put(fileAsBytes)
+								.put(signature)
+								.array();
+
+						FlashController.showAlert("Erasing Flash Memory.", AlertType.INFORMATION);
+
+						logger.trace("Start earasing");
+
+						final boolean erased = FlashWorker.erase(serialPort, unitAddress.getAddr(), arrayToSend.length)
+
+								.filter(answer->answer==FlashAnswer.ACK)
+								.isPresent();
+
+						logger.trace("Earasing is done: {}", erased);
+
+						FlashController.closeAlert();
+
+						if(erased)
+							writeToFlash(arrayToSend, unitAddress.getAddr() , 0);
+
+					} catch (IOException | SerialPortException e) {
+						logger.catching(e);
+					} catch (SerialPortTimeoutException e) {
+						logger.catching(Level.DEBUG, e);
+						FlashController.showAlert("Connection timeout", AlertType.ERROR);
+					}});
 	}
 
 	private void writeToFlash(byte[] bytesToWrite, int addr, int offset) throws SerialPortException, SerialPortTimeoutException {
@@ -215,12 +267,12 @@ public class UploadWorker {
 
 
 							Callable<File> callable = ()->fileChooser.showOpenDialog(chbUpload.getScene().getWindow());
-							FutureTask<File> ft = new FutureTask<>(callable);
-							Platform.runLater(ft);
+							FutureTask<File> task = new FutureTask<>(callable);
+							Platform.runLater(task);
 
 							File file = null;
 							try {
-								file = ft.get();
+								file = task.get();
 							} catch (InterruptedException | ExecutionException e) {
 								logger.catching(e);
 							}
@@ -285,7 +337,26 @@ public class UploadWorker {
 
 					profile.setPath(p);
 
-					Platform.runLater(()->chbUpload.getItems().add(1, profile));});
+					Platform.runLater(()->chbUpload.getItems().add(1, profile)); });
+	}
+
+	public void setProgramPath(Path path) {
+
+		final Optional<Path> oPath = Optional.ofNullable(path);
+
+		Platform.runLater(()->chbUpload.getItems().remove(program));
+
+		oPath.ifPresent(
+				p->{
+
+					program.setPath(p);
+
+					Platform.runLater(
+							()->{
+								final ObservableList<Object> items = chbUpload.getItems();
+								final int index = items.indexOf(otherProgram);
+								items.add(index, program);
+							}); });
 	}
 
 	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) {

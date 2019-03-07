@@ -1,14 +1,21 @@
 package irt.flash.helpers;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import java.util.prefs.Preferences;
 
 import org.apache.logging.log4j.LogManager;
@@ -21,6 +28,8 @@ import javafx.collections.FXCollections;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.TextArea;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
 
 public class DeviceWorker {
 
@@ -105,41 +114,119 @@ public class DeviceWorker {
 			
 							Properties properties = new Properties();
 							try {
+
 								properties.load(new StringReader(string));
-								Optional.ofNullable(properties.getProperty("device-serial-number"))
-								.map(String::toUpperCase)
-								.ifPresent(
-										serialNumber->{
-					
-											Flash3App.setTitle(serialNumber);
-											Path start = Optional.ofNullable(Flash3App.properties)
-
-													.map(p->p.getProperty("profiles_path"))
-													.map(Paths::get)
-													.orElseGet(
-															()->{
-																DirectoryChooser chooser = new DirectoryChooser();
-																chooser.setTitle("Select Profile Folder To Search");
-																return Optional.ofNullable(chooser.showDialog(txtArea.getScene().getWindow()))
-																		.map(File::toPath)
-																		.orElse(null);});
-											try {
-
-												Files.walk(start)
-												.filter(Files::isRegularFile)
-												.filter(p->p.getFileName().toString().toUpperCase().equals(serialNumber + ".BIN"))
-												.findFirst()
-												.ifPresent(uw::setProfilePath);
-
-											} catch (IOException e) {
-												logger.catching(e);
-											}
-										});
+								selectProgramByDeviceType(properties);
+								searchFileBySerialNumber(properties);
 
 							} catch (IOException e) {
 								logger.catching(e);
 							}
 		}));
+	}
+
+	private void selectProgramByDeviceType(Properties properties) throws IOException {
+		final String key = 	getProperty(properties, "device-type") + "." +
+							getProperty(properties, "device-revision") + "." +
+							getProperty(properties, "device-subtype");
+
+		File propertiesFile = new File(defaultDirectory, "flash3.properties");
+		if(!propertiesFile.exists())
+			if(!propertiesFile.createNewFile())
+				return;
+
+		Properties flash3Properties = new Properties();
+		flash3Properties.load(new FileReader(propertiesFile));
+		Path programPath = Optional.ofNullable(flash3Properties.getProperty(key))
+
+				.map(Paths::get).orElseGet(
+						()->{
+							FileChooser fileChooser = new FileChooser();
+							fileChooser.setTitle("Select the program to upload");
+							fileChooser.getExtensionFilters().add(new ExtensionFilter("IRT Technologies BIN file", "*.bin"));
+
+							final String prefsKey = (key + "_file");
+							Optional.ofNullable(prefs.get(prefsKey, null)).ifPresent(
+
+									path->{
+
+										File fileFromPref = new File(path);
+										fileChooser.setInitialDirectory(fileFromPref.getParentFile());
+										fileChooser.setInitialFileName(fileFromPref.getName());});
+
+							Callable<File> callable = ()->fileChooser.showOpenDialog(txtArea.getScene().getWindow());
+							FutureTask<File> task = new FutureTask<>(callable);
+							Platform.runLater(task);
+
+							File fileForProperties = null;
+							try {
+								fileForProperties = task.get();
+							} catch (InterruptedException | ExecutionException e) {
+								logger.catching(e);
+							}
+
+							final Optional<File> oResult = Optional.ofNullable(fileForProperties);
+							oResult.ifPresent(
+									f->{
+
+										final String name = propertiesFile.getName().replace(".properties", ".old");
+										final Path path = propertiesFile.toPath();
+										try {
+											Files.copy(path, path.resolveSibling(name), StandardCopyOption.REPLACE_EXISTING);
+										} catch (IOException e1) {
+											logger.catching(e1);
+										}
+
+										flash3Properties.put(key, f.toString());
+										try(OutputStream os = new FileOutputStream(propertiesFile)){
+
+											flash3Properties.store(os, "Flash v3 properties");
+
+										} catch (IOException e) {
+											logger.catching(e);
+										}
+										});
+
+							return oResult.map(File::toPath).orElse(null);
+						});
+
+		uploadWorker.setProgramPath(programPath);
+	}
+
+	private String getProperty(Properties properties, String key) {
+		return properties.getProperty(key, "_").split("[\\s#]++")[0];
+	}
+
+	private void searchFileBySerialNumber(Properties properties) {
+		Optional.ofNullable(properties.getProperty("device-serial-number"))
+		.map(String::toUpperCase)
+		.ifPresent(
+				serialNumber->{
+
+					Flash3App.setSerialNumber(serialNumber);
+					Path start = Optional.ofNullable(Flash3App.properties)
+
+							.map(p->p.getProperty("profiles_path"))
+							.map(Paths::get)
+							.orElseGet(
+									()->{
+										DirectoryChooser chooser = new DirectoryChooser();
+										chooser.setTitle("Select Profile Folder To Search");
+										return Optional.ofNullable(chooser.showDialog(txtArea.getScene().getWindow()))
+												.map(File::toPath)
+												.orElse(null);});
+					try {
+
+						Files.walk(start)
+						.filter(Files::isRegularFile)
+						.filter(p->p.getFileName().toString().toUpperCase().equals(serialNumber + ".BIN"))
+						.findFirst()
+						.ifPresent(uploadWorker::setProfilePath);
+
+					} catch (IOException e) {
+						logger.catching(e);
+					}
+				});
 	}
 
 	/**

@@ -7,6 +7,7 @@ import irt.flash.helpers.ComPortWorker;
 import irt.flash.helpers.StageSizeAndPosition;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -35,7 +36,10 @@ public class Flash3App extends Application {
 	public void start(Stage stage) throws Exception {
 
 		Flash3App.stage = stage;
-		stage.getIcons().add(new Image(getClass().getResourceAsStream("/images/flash.png")));
+		final ObservableList<Image> icons = stage.getIcons();
+
+		for(int i=16; i<=512; i*=2) 
+			icons.add(new Image(getClass().getResourceAsStream("/images/flash_" + i + ".png")));
 
 		String fxmlFile = "/fxml/Flash.fxml";
         FXMLLoader loader = new FXMLLoader();
@@ -48,6 +52,9 @@ public class Flash3App extends Application {
         stage.setScene(scene);
         size.setStageProperties(stage);
         stage.show();
+
+        final FlashController controller = (FlashController)loader.getController();
+        controller.setGlobalOnKeyTyped();
     }
 
 	@Override
@@ -56,13 +63,33 @@ public class Flash3App extends Application {
 		ComPortWorker.disconect();
 	}
 
-	public static void setTitle(String title) {
+	public static void setSerialNumber(String serialNumber) {
 		Optional.ofNullable(stage).ifPresent(
 				st->{
 					Platform.runLater(
 							()->{
 								final String t = st.getTitle().split(" : ")[0];
-								st.setTitle(t + " : " + title); });
+								st.setTitle(t + " : " + serialNumber); });
+		});
+	}
+
+	public static void setUnitType(String UnitType) {
+		Optional.ofNullable(stage).ifPresent(
+				st->{
+					Platform.runLater(
+							()->{
+								final String t = st.getTitle().split(" - ")[0];
+								st.setTitle(t + " - " + UnitType); });
+		});
+	}
+
+	public static void se(String UnitType) {
+		Optional.ofNullable(stage).ifPresent(
+				st->{
+					Platform.runLater(
+							()->{
+								final String t = st.getTitle().split(" - ")[0];
+								st.setTitle(t + " - " + UnitType); });
 		});
 	}
 }

@@ -8,7 +8,7 @@ public enum UnitAddress {
 	CONVERTER	("CONVERTER"		, 0x080C0000),
 	BIAS		("BIAS BOARD"		, 0x080E0000),
 	HP_BIAS		("HP BIAS"			, 0x081E0000),
-	SHELF		("Shelf Controller"	, 0x080E0000),
+	SHELF		("SHELF CONTROLLER"	, 0x080E0000),
 	ORPC		("ORPC"				, 0x081C0000);
 
 	private String text;

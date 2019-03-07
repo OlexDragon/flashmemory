@@ -9,7 +9,7 @@
 	<name>flash</name>
 
 	<packaging>jar</packaging>
-	<version>3.0.1</version>
+	<version>3.0.2</version>
 
 	<organization>
 		<name>IRT Technologies</name>
@@ -69,7 +69,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.7.0</version>
+				<version>3.8.0</version>
 				<configuration>
 					<source>1.8</source>
 					<target>1.8</target>
@@ -86,9 +86,9 @@
 					<vendor>IRT Technologies</vendor>
 					<mainClass>${mainClass}</mainClass>
 					<bundler>EXE</bundler>
+					<bundleArguments><icon>${project.basedir}/src/main/resources/images/flash3.ico</icon></bundleArguments>
 				</configuration>
 			</plugin>
 		</plugins>
 	</build>
-
 </project>

@@ -135,15 +135,15 @@ public class FlashWorker {
 			// Stop the process, too many attempts.
 			if(count++>7) {
 				count = 0;
-				FlashController.showAlert("A lot of wrong answers", AlertType.ERROR);
+				FlashController.showAlert("Communication error.", "A lot of wrong answers", AlertType.ERROR);
 				return Optional.empty();
 			}
 
-			FlashController.showAlert("Aswer is wrong: 0x" + DatatypeConverter.printHexBinary(new byte[] {readByte}), AlertType.ERROR);
+			FlashController.showAlert("Communication error.", "Aswer is wrong: 0x" + DatatypeConverter.printHexBinary(new byte[] {readByte}), AlertType.ERROR);
 			// Trying to get the right answer again.
 			return waitForACK(serialPort, timeout);
 		}else
-			oFlashAnswer.filter(a->a!=FlashAnswer.ACK).ifPresent(a->FlashController.showAlert("Aswer is " + a, AlertType.ERROR));
+			oFlashAnswer.filter(a->a!=FlashAnswer.ACK).ifPresent(a->FlashController.showAlert("Communication error.", "Aswer is " + a, AlertType.ERROR));
 
 		count = 0;
 		return oFlashAnswer;
@@ -182,7 +182,7 @@ public class FlashWorker {
 
 			final String message = "Can not send bytes: " + DatatypeConverter.printHexBinary(bytes);
 			logger.debug(message);
-			FlashController.showAlert(message, AlertType.ERROR);
+			FlashController.showAlert("Communication error.", message, AlertType.ERROR);
 			return Optional.empty();
 		}
 

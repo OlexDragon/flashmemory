@@ -22,10 +22,11 @@ public enum FlashAnswer {
 	}
 
 	public static Optional<FlashAnswer> valueOf(byte key){
-		return Arrays
+		final Optional<FlashAnswer> findAny = Arrays
 				.stream(values())
 				.filter(a->a.answer==key)
 				.findAny();
+		return findAny;
 	}
 
 	@Override

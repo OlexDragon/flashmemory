@@ -1,10 +1,19 @@
 package irt.flash.helpers;
 
+import static irt.flash.exception.ExceptionWrapper.catchConsumerException;
+import static irt.flash.exception.ExceptionWrapper.catchFunctionException;
+import static irt.flash.exception.ExceptionWrapper.catchRunnableException;
+import static irt.flash.exception.ExceptionWrapper.catchSupplierException;
+
+import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.nio.charset.MalformedInputException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -13,9 +22,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.prefs.Preferences;
+import java.util.stream.Stream;
 
 import javax.xml.bind.DatatypeConverter;
 
@@ -27,6 +36,7 @@ import irt.flash.FlashController;
 import irt.flash.data.FlashAnswer;
 import irt.flash.data.FlashCommand;
 import irt.flash.data.UnitAddress;
+import irt.flash.exception.WrapperException;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.collections.FXCollections;
@@ -47,13 +57,14 @@ import jssc.SerialPortTimeoutException;
 
 public class UploadWorker {
 
+	private static final String OPEN_FILE_LOCATION = "Open File Location";
+	private static final String OPEN = "Open Profile";
 	private static final Logger logger = LogManager.getLogger();
-
 	private static final int MAX_VAR_RAM_SIZE = ReadFlashWorker.MAX_VAR_RAM_SIZE;
 
 	private ChoiceBox<Object> chbUpload;
 	private final ObservableList<Object> list;
-	private final PathHolder profile = new PathHolder();
+	public final static PathHolder profile = new PathHolder();
 	private final PathHolder otherProfile = new PathHolder("Other Profile");
 	private final PathHolder program = new PathHolder();
 	private final PathHolder otherProgram = new PathHolder("Other Program");
@@ -62,9 +73,15 @@ public class UploadWorker {
 
 	private SerialPort serialPort;
 
-	public UploadWorker(ChoiceBox<Object> chbUpload) {
+	private ChoiceBox<ThreadWorker> chbEdit;
+
+	private ProfileWorker profileWorker;
+
+	public UploadWorker(ChoiceBox<Object> chbUpload, ChoiceBox<ThreadWorker> chbEdit) {
 
 		this.chbUpload= chbUpload;
+		this.chbEdit = chbEdit;
+
 		prefs = Preferences.userNodeForPackage(getClass());
 
 		list = FXCollections.observableArrayList("Upload ...", otherProfile, new SeparatorMenuItem(), otherProgram);
@@ -97,9 +114,36 @@ public class UploadWorker {
 
 								unitAddress->{
 
-									final Path path = getPath(pathHolder, unitAddress);
-									logger.info("File to upload: {}", path);
-									uplodeToTheFlash(unitAddress, path);
+									try {
+
+										final Path path = getPath(pathHolder, unitAddress);
+										logger.info("File to upload: {}", path);
+										uplodeToTheFlash(unitAddress, path);
+
+									}catch(WrapperException e) {
+
+							    		if(isSerialPortTimeoutException(e)) {
+
+							    			logger.catching(Level.DEBUG, e);
+							    			FlashController.showAlert("Connection error.", "Connection timeout", AlertType.ERROR);
+							    			return;
+							    		}
+
+							    		final NoSuchFileException noSuchFileException = ProfileWorker.getNoSuchFileException(e);
+
+										if(noSuchFileException == null) {
+											logger.catching(e);
+											return;
+										}
+
+										logger.catching(Level.DEBUG, e);
+										final String file = noSuchFileException.getFile();
+
+										FlashController.showAlert("Upload profile.", "File not found: " + file, AlertType.ERROR);
+
+							    	}catch(Exception e) {
+										logger.catching(e);
+									}
 								});
 
 						FlashController.disable(false);
@@ -109,103 +153,127 @@ public class UploadWorker {
 				});
 	}
 
+	private boolean isSerialPortTimeoutException(Throwable e){
+
+		final Throwable cause = e.getCause();
+
+		if(cause == null)
+			return false;
+
+		return Optional.of(cause).filter(SerialPortTimeoutException.class::isInstance).map(c->true).orElseGet(()->isSerialPortTimeoutException(cause));
+	}
+
 	public void uplodeToTheFlash(final Path path) {
-		ThreadWorker.runThread(()->{
+		ThreadWorker.runThread(
+				catchRunnableException(
+						()->{
 
-			FutureTask<UnitAddress> ft = new FutureTask<UnitAddress>(
-					()->{
-						Alert alert = new Alert(AlertType.CONFIRMATION);
-						alert.setTitle("Select the Unit Type");
-						alert.setHeaderText(null);
-						alert.setContentText("Choose your option.");
+							final long fileLength = path.toFile().length();
+							UnitAddress unitAddress = null;
 
-						List<ButtonType> buttons = new ArrayList<>();
-						final UnitAddress[] values = UnitAddress.values();
-						for(int i=0; i<values.length; i++)
-							buttons.add(new ButtonType(values[i].name()));
-						buttons.add(new ButtonType("Cancel", ButtonData.CANCEL_CLOSE));
+							// if the file is not so big get UnitAddress from 'unit-type'
+							if(fileLength<10*1024) {
+								try(Stream<String> stream = Files.lines(path)){
 
-						alert.getButtonTypes().setAll(buttons);
+									unitAddress = ProfileWorker.getUnitAddress(stream).orElse(null);
 
-						return alert.showAndWait()
+								} catch (MalformedInputException | UncheckedIOException e) {
+									logger.info("This is not a profile, perhaps this is a program. {}", e.getMessage());
+								}
+							}
 
-								.filter(b->b.getButtonData()!=ButtonData.CANCEL_CLOSE)
-								.map(ButtonType::getText)
-								.map(UnitAddress::valueOf)
-								.orElse(null);});
-			try {
+							// if the UnitAddress cannot be obtained from the profile
+							if(unitAddress==null) {
 
-				Platform.runLater(ft);
-				final UnitAddress unitAddress = ft.get();
-				uplodeToTheFlash(unitAddress, path);
+								FutureTask<UnitAddress> task = ThreadWorker.runFxFutureTask(
+										()->{
+											Alert alert = new Alert(AlertType.CONFIRMATION);
+											alert.setTitle("Select the Unit Type");
+											alert.setHeaderText(null);
+											alert.setContentText("Choose your option.");
 
-			} catch (InterruptedException | ExecutionException e) {
-				logger.catching(e);
+											List<ButtonType> buttons = new ArrayList<>();
+											final UnitAddress[] values = UnitAddress.values();
+											for(int i=0; i<values.length; i++)
+												buttons.add(new ButtonType(values[i].name()));
+											buttons.add(new ButtonType("Cancel", ButtonData.CANCEL_CLOSE));
+
+											alert.getButtonTypes().setAll(buttons);
+
+											return alert.showAndWait()
+
+													.filter(b->b.getButtonData()!=ButtonData.CANCEL_CLOSE)
+													.map(ButtonType::getText)
+													.map(UnitAddress::valueOf)
+													.orElse(null);});
+								unitAddress = task.get();
 			}
-		});
+
+
+			uplodeToTheFlash(unitAddress, path);
+		}));
 	}
 
 	public void uplodeToTheFlash(UnitAddress unitAddress, final Path path) {
 		logger.entry(unitAddress, path);
 
+		if(unitAddress==null)
+			return;
+
 		Optional.ofNullable(path).ifPresent(
-				p->{
+				catchConsumerException(
+						p->{
 
-					try {
+								final byte[] fileAsBytes = Files.readAllBytes(p);
 
-						final byte[] fileAsBytes = Files.readAllBytes(p);
+								//Add signature to the end of the file.
+								Properties properties = new Properties();
+								properties.load(getClass().getResourceAsStream("/project.properties"));
+								String version = properties.getProperty("version");
+								final byte[] signature = new StringBuffer()
 
-						//Add signature to the end of the file.
-						Properties properties = new Properties();
-						properties.load(getClass().getResourceAsStream("/project.properties"));
-						String version = properties.getProperty("version");
-						final byte[] signature = new StringBuffer()
+										.append("\n#Uploaded by Flash v")
+										.append(version)
+										.append(" on ")
+										.append(new Timestamp(new Date().getTime()))
+										.append(" from ")
+										.append(InetAddress.getLocalHost().getHostName())
+										.append(" computer.")
+										.toString()
+										.getBytes();
 
-								.append("\n#Uploaded by Flash v")
-								.append(version)
-								.append(" on ")
-								.append(new Timestamp(new Date().getTime()))
-								.append(" from ")
-								.append(InetAddress.getLocalHost().getHostName())
-								.append(" computer.")
-								.toString()
-								.getBytes();
+								logger.debug("signature: {}", signature);
 
-						logger.debug("signature: {}", signature);
+								//	size should always be a multiple of 4.
+								int size = fileAsBytes.length + signature.length;
+								int sizeToWrite = Optional.of(size % 4).filter(modulus->modulus>0).map(modulus->size + modulus).orElse(size);
 
-						//	size should always be a multiple of 4.
-						int size = fileAsBytes.length + signature.length;
-						int sizeToWrite = Optional.of(size % 4).filter(modulus->modulus>0).map(modulus->size + modulus).orElse(size);
+								byte[] arrayToSend = ByteBuffer
 
-						byte[] arrayToSend = ByteBuffer
+										.allocate(sizeToWrite)
+										.put(fileAsBytes)
+										.put(signature)
+										.array();
 
-								.allocate(sizeToWrite)
-								.put(fileAsBytes)
-								.put(signature)
-								.array();
+								FlashController.showAlert("Upload to the flash.", "Erasing Flash Memory.", AlertType.INFORMATION);
 
-						FlashController.showAlert("Erasing Flash Memory.", AlertType.INFORMATION);
+								logger.info("Start earasing");
 
-						logger.trace("Start earasing");
+								final int addr = unitAddress.getAddr();
+								final boolean erased = FlashWorker.erase(serialPort, addr, arrayToSend.length)
 
-						final boolean erased = FlashWorker.erase(serialPort, unitAddress.getAddr(), arrayToSend.length)
+										.filter(answer->answer==FlashAnswer.ACK)
+										.isPresent();
 
-								.filter(answer->answer==FlashAnswer.ACK)
-								.isPresent();
+								FlashController.closeAlert();
 
-						logger.trace("Earasing is done: {}", erased);
+								if(erased) {
+									logger.info("Write file to {} memory area ({})", unitAddress, p);
+									writeToFlash(arrayToSend, addr , 0);
+								}
 
-						FlashController.closeAlert();
-
-						if(erased)
-							writeToFlash(arrayToSend, unitAddress.getAddr() , 0);
-
-					} catch (IOException | SerialPortException e) {
-						logger.catching(e);
-					} catch (SerialPortTimeoutException e) {
-						logger.catching(Level.DEBUG, e);
-						FlashController.showAlert("Connection timeout", AlertType.ERROR);
-					}});
+								FlashController.showAlert("Upload to the flash.", "The file " + path.getFileName() + " has been loaded into the memory area of the " + unitAddress + ".", AlertType.INFORMATION);
+						}));
 	}
 
 	private void writeToFlash(byte[] bytesToWrite, int addr, int offset) throws SerialPortException, SerialPortTimeoutException {
@@ -232,8 +300,9 @@ public class UploadWorker {
 			final Optional<FlashAnswer> oFlashAnswer = FlashWorker.addCheckSum(UnitAddress.intToBytes(addr + offset))				
 
 					//Bytes 3 to 7: Send the address + checksum
-					.flatMap(this::writeAndWaitForAck)
-					.flatMap(b->writeAndWaitForAck(bs));
+					.flatMap(catchFunctionException(this::writeAndWaitForAck))
+					.filter(answer->answer==FlashAnswer.ACK)
+					.flatMap(catchFunctionException(b->writeAndWaitForAck(bs)));
 
 			if(!oFlashAnswer.filter(a->a==FlashAnswer.ACK).isPresent())
 				break;
@@ -242,6 +311,7 @@ public class UploadWorker {
 			double progress = offset/(double)totalLength;
 			FlashController.setProgressBar(progress);
 		}
+
 		FlashController.closeProgressBar();
 	}
 
@@ -249,40 +319,36 @@ public class UploadWorker {
 
 		return Optional.ofNullable(pathHolder.path)
 				.orElseGet(
+						catchSupplierException(
+								()->{
 
-						()->{
+									FileChooser fileChooser = new FileChooser();
+									fileChooser.getExtensionFilters().add(new ExtensionFilter("IRT Technologies BIN file", "*.bin"));
+									fileChooser.setTitle("Select the Profile");
 
-							FileChooser fileChooser = new FileChooser();
-							fileChooser.getExtensionFilters().add(new ExtensionFilter("IRT Technologies BIN file", "*.bin"));
-							fileChooser.setTitle("Select the Profile");
+									final String key = (unitAddress + "_file");
+									Optional.ofNullable(prefs.get(key, null)).map(File::new).filter(File::exists).ifPresent(
 
-							final String key = (unitAddress + "_file");
-							Optional.ofNullable(prefs.get(key, null)).ifPresent(
-
-									path->{
-
-										File p = new File(path);
-										fileChooser.setInitialDirectory(p.getParentFile());
-										fileChooser.setInitialFileName(p.getName());});
+											f->{
+												fileChooser.setInitialDirectory(f.getParentFile());
+												fileChooser.setInitialFileName(f.getName());});
+									
 
 
-							Callable<File> callable = ()->fileChooser.showOpenDialog(chbUpload.getScene().getWindow());
-							FutureTask<File> task = new FutureTask<>(callable);
-							Platform.runLater(task);
+									Callable<File> callable = ()->fileChooser.showOpenDialog(chbUpload.getScene().getWindow());
+									FutureTask<File> task = new FutureTask<>(callable);
+									Platform.runLater(task);
 
-							File file = null;
-							try {
-								file = task.get();
-							} catch (InterruptedException | ExecutionException e) {
-								logger.catching(e);
-							}
+									File file = null;
 
-							final Optional<File> oFile = Optional.ofNullable(file);
-							oFile
-							.ifPresent(f->prefs.put(key, f.toString()));
+									file = task.get();
 
-							return oFile.map(File::toPath).orElse(null);
-						});
+									final Optional<File> oFile = Optional.ofNullable(file);
+									oFile
+									.ifPresent(f->prefs.put(key, f.toString()));
+
+									return oFile.map(File::toPath).orElse(null);
+								}));
 	}
 
 	private UnitAddress getUnitAddress(final PathHolder pathHolder) {
@@ -291,90 +357,88 @@ public class UploadWorker {
 
 				.map(selectedItem->selectedItem.unitAddress)
 				.orElseGet(
-						()->{
-							FutureTask<UnitAddress> ft = new FutureTask<UnitAddress>(
-									()->{
-										Alert alert = new Alert(AlertType.CONFIRMATION);
-										alert.setTitle("Select the Unit Type");
-										alert.setHeaderText(null);
-										alert.setContentText("Choose your option.");
+						catchSupplierException(
+								()->{
 
-										List<ButtonType> buttons = new ArrayList<>();
-										final UnitAddress[] values = UnitAddress.values();
-										for(int i=1; i<values.length; i++)
-											buttons.add(new ButtonType(values[i].name()));
-										buttons.add(new ButtonType("Cancel", ButtonData.CANCEL_CLOSE));
+									FutureTask<UnitAddress> task = ThreadWorker.runFxFutureTask(
+											()->{
+												Alert alert = new Alert(AlertType.CONFIRMATION);
+												alert.setTitle("Select the Unit Type");
+												alert.setHeaderText(null);
+												alert.setContentText("Choose your option.");
 
-										alert.getButtonTypes().setAll(buttons);
+												List<ButtonType> buttons = new ArrayList<>();
+												final UnitAddress[] values = UnitAddress.values();
+												for(int i=1; i<values.length; i++)
+													buttons.add(new ButtonType(values[i].name()));
+												buttons.add(new ButtonType("Cancel", ButtonData.CANCEL_CLOSE));
 
-										return alert.showAndWait()
+												alert.getButtonTypes().setAll(buttons);
 
-												.filter(b->b.getButtonData()!=ButtonData.CANCEL_CLOSE)
-												.map(ButtonType::getText)
-												.map(UnitAddress::valueOf)
-												.orElse(null);});
-							try {
+												return alert.showAndWait()
 
-								Platform.runLater(ft);
-								return ft.get();
+														.filter(b->b.getButtonData()!=ButtonData.CANCEL_CLOSE)
+														.map(ButtonType::getText)
+														.map(UnitAddress::valueOf)
+														.orElse(null);});
 
-							} catch (InterruptedException | ExecutionException e) {
-								logger.catching(e);
-							}
-
-							return null;
-						});
+									return task.get();
+						}));
 	}
 
-	public void setProfilePath(Path path) {
+	/**
+	 * @param path to profile
+	 * This function remove item 'profile' (PathHolder) from chbUpload (ChoiceBox)
+	 * @param serialNumber 
+	 */
+	public void setProfilePath(Path path, String serialNumber) {
 
-		final Optional<Path> oPath = Optional.ofNullable(path);
+		final ObservableList<Object> uploadItems = chbUpload.getItems();
+		final ObservableList<ThreadWorker> editItems = chbEdit.getItems();
 
-		Platform.runLater(()->chbUpload.getItems().remove(profile));
+		profile.setPath(path);
+		Platform.runLater(()->uploadItems.remove(profile));
 
-		oPath.ifPresent(
-				p->{
+		if(path==null) {
+			Platform.runLater(
+					()->{
 
-					profile.setPath(p);
+						editItems.add(new ThreadWorker("Save " + serialNumber, ()->profileWorker.saveProfile(null)));
+					});
+			return;
+		}
 
-					Platform.runLater(()->chbUpload.getItems().add(1, profile)); });
+		Platform.runLater(
+				()->{
+					uploadItems.add(1, profile);
+
+					editItems.add(new ThreadWorker(OPEN, ()->{ try { Desktop.getDesktop().open(path.toFile()); } catch (IOException e) { logger.catching(e); }}));
+					editItems.add(new ThreadWorker(OPEN_FILE_LOCATION, ()->{try { Runtime.getRuntime().exec("explorer.exe /select," + path); } catch (IOException e) { logger.catching(e); }})); });
 	}
 
 	public void setProgramPath(Path path) {
 
-		final Optional<Path> oPath = Optional.ofNullable(path);
+		final ObservableList<Object> uploadItems = chbUpload.getItems();
 
-		Platform.runLater(()->chbUpload.getItems().remove(program));
+		program.setPath(path);
+		Platform.runLater(()->uploadItems.remove(program));
 
-		oPath.ifPresent(
+		Optional.ofNullable(path).ifPresent(
 				p->{
 
-					program.setPath(p);
 
 					Platform.runLater(
 							()->{
-								final ObservableList<Object> items = chbUpload.getItems();
-								final int index = items.indexOf(otherProgram);
-								items.add(index, program);
-							}); });
+								final int index = uploadItems.indexOf(otherProgram);
+								uploadItems.add(index, program); }); });
 	}
 
-	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) {
-
-		try {
+	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws SerialPortException, SerialPortTimeoutException {
 
 			return FlashWorker.sendBytes(serialPort, bytes, 500);
-
-		} catch (SerialPortException e) {
-			logger.catching(e);
-		} catch (SerialPortTimeoutException e) {
-			logger.catching(Level.DEBUG, e);
-			FlashController.showAlert("Connection timeout", AlertType.ERROR);
-		}
-		return Optional.empty();
 	}
 
-	private class PathHolder{
+	public static class PathHolder{
 
 		private String title;
 		private Path path;
@@ -385,9 +449,16 @@ public class UploadWorker {
 			this.title = title;
 		}
 
+		public Path getPath() {
+			return path;
+		}
 		public void setPath(Path path) {
 			this.path = path;
-			this.title = path.getFileName().toString();
+			this.title = Optional.ofNullable(path).map(Path::getFileName).map(Path::toString).orElse("No Path Specified");
+		}
+
+		public UnitAddress getUnitAddress() {
+			return unitAddress;
 		}
 
 		public void setUnitAddress(UnitAddress unitAddress) {
@@ -407,5 +478,9 @@ public class UploadWorker {
 
 	public void setSerialPort(SerialPort serialPort) {
 		this.serialPort = serialPort;
+	}
+
+	public void setProfileWorker(ProfileWorker profileWorker) {
+		this.profileWorker = profileWorker;
 	}
 }

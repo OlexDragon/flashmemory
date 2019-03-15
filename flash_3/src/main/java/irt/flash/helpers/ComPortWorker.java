@@ -1,5 +1,4 @@
 package irt.flash.helpers;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,8 +84,7 @@ public class ComPortWorker {
 					try {
 						sp.closePort();
 					} catch (SerialPortException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+						logger.catching(e);
 					}
 					chbPorts.setUserData(null);
 					btnConnect.setText("Connect");

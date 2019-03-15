@@ -1,5 +1,8 @@
 package irt.flash.helpers;
 
+import static irt.flash.exception.ExceptionWrapper.catchConsumerException;
+import static irt.flash.exception.ExceptionWrapper.catchFunctionException;
+
 import java.nio.ByteBuffer;
 import java.util.Optional;
 
@@ -12,12 +15,13 @@ import irt.flash.FlashController;
 import irt.flash.data.FlashAnswer;
 import irt.flash.data.FlashCommand;
 import irt.flash.data.UnitAddress;
+import irt.flash.exception.WrapperException;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.SingleSelectionModel;
-import javafx.scene.control.Alert.AlertType;
 import javafx.util.StringConverter;
 import jssc.SerialPort;
 import jssc.SerialPortException;
@@ -66,116 +70,110 @@ public class ReadFlashWorker {
 					if(unitAddress==UnitAddress.PROGRAM)
 						return;
 
-					logger.info("Read from {}", unitAddress);
+					logger.info("Read from Flash ({})", unitAddress);
 
-					readFromFlash(unitAddress);
+					try {
+
+						readFromFlash(unitAddress);
+
+					} catch (SerialPortTimeoutException e) {
+
+						logger.catching(Level.DEBUG, e);
+						FlashController.showAlert("Connection error.", "Connection timeout", AlertType.ERROR);
+
+					}catch (WrapperException e) {
+
+			    		if(e.getCause() instanceof SerialPortTimeoutException) {
+
+			    			logger.catching(Level.DEBUG, e);
+			    			FlashController.showAlert("Connection error.", "Connection timeout", AlertType.ERROR);
+
+			    		}else
+			    			logger.catching(e);
+
+			    	}catch (Exception e2) {
+						logger.catching(e2);
+					}
 
 					selectionModel.select(0);
 				});
 	}
 
-	private void readFromFlash(UnitAddress unitAddress) {
+	private void readFromFlash(UnitAddress unitAddress) throws SerialPortTimeoutException, SerialPortException {
 
-			// share the UnitAddresst with uploadWorker
+		byteBuffer = null;
+
+				// share the UnitAddresst with uploadWorker
 			uploadWorker.setUnitAddress(unitAddress);
 			Flash3App.setUnitType(unitAddress.name());
 
 			if(serialPort == null || !serialPort.isOpened()) {
 				final String message = "Unit is not connected.";
 				logger.debug(message);
-				FlashController.showAlert(message, AlertType.ERROR);
+				FlashController.showAlert("Connection error.", message, AlertType.ERROR);
 				return;
 			}
 
 			byteBuffer = ByteBuffer.allocate(MAX_BUFFER_SIZE);
 
-			try {
-
-				readFromFlash(unitAddress.getAddr());
-				deviceWorker.setReadData(byteBuffer);
-				byteBuffer = null;
-
-			} catch (SerialPortException e) {
-				logger.catching(e);
-			} catch (SerialPortTimeoutException e) {
-				logger.catching(Level.DEBUG, e);
-				FlashController.showAlert("Connection timeout", AlertType.ERROR);
-			}
+			if(readFromFlash(unitAddress.getAddr()))
+					deviceWorker.setReadData(byteBuffer);
 	}
 
-	private void readFromFlash(final int addr) throws SerialPortException, SerialPortTimeoutException {
+	private boolean readFromFlash(final int addr) throws SerialPortException, SerialPortTimeoutException{
 		logger.debug("Read from address: 0x{}", ()->Integer.toHexString(addr));
 
-		if(!FlashWorker.sendCommand(serialPort, FlashCommand.READ_MEMORY).filter(answer->answer==FlashAnswer.ACK).isPresent()) {
-			return;
-		}
+		Optional<byte[]> oResult = FlashWorker.sendCommand(serialPort, FlashCommand.READ_MEMORY)
 
-		//Bytes 3 to 7: Send the address + checksum
-		FlashWorker.addCheckSum(UnitAddress.intToBytes(addr))				
-		.flatMap(this::writeAndWaitForAck)
+				.filter(answer->answer==FlashAnswer.ACK)
 
-		//Bytes 8 to 9:Send the number of bytes to be read – 1 (0 < N ≤ 255) + checksum
-		.flatMap(a->writeAndWaitForAck(MAX_BYTES_TO_READ))
-		.flatMap(size->readBytes())
-		.ifPresent(
-				b->{
+				//Bytes 3 to 7: Send the address + checksum
+				.flatMap(a->FlashWorker.addCheckSum(UnitAddress.intToBytes(addr)))
+				.flatMap(catchFunctionException(this::writeAndWaitForAck))
+				.filter(answer->answer==FlashAnswer.ACK)
 
-					byteBuffer.put(b);
+				//Bytes 8 to 9:Send the number of bytes to be read – 1 (0 < N ≤ 255) + checksum
+				.flatMap(catchFunctionException(a->writeAndWaitForAck(MAX_BYTES_TO_READ)))
+				.filter(answer->answer==FlashAnswer.ACK)
+				.flatMap(
+						catchFunctionException(
+								answer->readBytes()));
 
-					// check end of the array for 0xFF ( it means no more data )
-					int i;
-					final int repeats = 7;
-					for(i = 1; i<repeats; i++) {
+						
+		oResult.ifPresent(
+				catchConsumerException(
+						b->{
+
+							byteBuffer.put(b);
+
+							// check end of the array for 0xFF ( it means no more data )
+							int i;
+							final int repeats = 7;
+							for(i = 1; i<repeats; i++) {
 	
-						if(b[b.length - i]!=(byte)0xFF)
-							break;
-					}
+								if(b[b.length - i]!=(byte)0xFF)
+									break;
+							}
 
-					//if no more data return
-					if(i>=repeats)
-						return;
+							//if no more data return
+							if(i>=repeats)
+								return;
 
-					try {
+							// Read from memory the next section (next 256 bytes)
+							readFromFlash(addr + MAX_VAR_RAM_SIZE);
+						}));
 
-						// Read from memory the next section (next 256 bytes)
-						readFromFlash(addr + MAX_VAR_RAM_SIZE);
-
-					} catch (SerialPortException e) {
-						logger.catching(e);
-					} catch (SerialPortTimeoutException e) {
-						logger.catching(Level.DEBUG, e);
-						FlashController.showAlert("Connection timeout", AlertType.ERROR);
-					}
-				});
+		return oResult.isPresent();
 	}
 
-	private Optional<byte[]> readBytes() {
-		try {
+	private Optional<byte[]> readBytes() throws SerialPortException, SerialPortTimeoutException {
 
 			return Optional.of(serialPort.readBytes(MAX_VAR_RAM_SIZE, 10000));
-
-		} catch (SerialPortException e) {
-			logger.catching(e);
-		} catch ( SerialPortTimeoutException e) {
-			logger.catching(Level.DEBUG, e);
-			FlashController.showAlert("Connection timeout", AlertType.ERROR);
-		}
-		return Optional.empty();
 	}
 
-	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) {
-
-		try {
+	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws SerialPortTimeoutException, SerialPortException {
 
 			return FlashWorker.sendBytes(serialPort, bytes, 500);
-
-		} catch (SerialPortException e) {
-			logger.catching(e);
-		} catch (SerialPortTimeoutException e) {
-			logger.catching(Level.DEBUG, e);
-			FlashController.showAlert("Connection timeout", AlertType.ERROR);
-		}
-		return Optional.empty();
 	}
 
 	public void setSerialPort(SerialPort serialPort) {

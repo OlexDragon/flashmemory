@@ -4,7 +4,26 @@ import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
+import javafx.application.Platform;
+
 public class ThreadWorker {
+
+	private final String name;
+	private final Runnable runnable;
+
+	public ThreadWorker(String name, Runnable runnable) {
+		this.name = name;
+		this.runnable = runnable;
+	}
+
+	public void start() {
+		runThread(runnable);
+	}
+
+	@Override
+	public String toString() {
+		return name;
+	}
 
 	public static Thread runThread(Runnable target) {
 
@@ -17,11 +36,19 @@ public class ThreadWorker {
 
 	public static <T> FutureTask<T> runFutureTask(Callable<T> callable) {
 
-		FutureTask<T> ft = new FutureTask<>(callable);
-		Thread t = new Thread(ft);
+		FutureTask<T> task = new FutureTask<>(callable);
+		Thread t = new Thread(task);
 		Optional.of(t.getPriority()).filter(p->p>Thread.MIN_PRIORITY).map(p->--p).ifPresent(p->t.setPriority(p));
 		t.start();
 		
-		return ft;
+		return task;
+	}
+
+	public static <T> FutureTask<T> runFxFutureTask(Callable<T> callable) {
+
+		FutureTask<T> task = new FutureTask<>(callable);
+		Platform.runLater(task);
+		
+		return task;
 	}
 }

@@ -43,6 +43,8 @@ public class ReadFlashWorker {
 
 	private UploadWorker uploadWorker;
 
+	private UnitAddress unitAddress;
+
 	public ReadFlashWorker(ChoiceBox<UnitAddress> chbRead) {
 		final UnitAddress[] addresses = UnitAddress.values();
 		final ObservableList<UnitAddress> observableArrayList = FXCollections.observableArrayList(addresses);
@@ -65,10 +67,12 @@ public class ReadFlashWorker {
 		selectionModel.selectedItemProperty().addListener(
 				roop->{
 
-					final UnitAddress unitAddress = (UnitAddress) ((ReadOnlyObjectProperty<?>)roop).getValue();
+					UnitAddress ua = (UnitAddress) ((ReadOnlyObjectProperty<?>)roop).getValue();
 
-					if(unitAddress==UnitAddress.PROGRAM)
+					if(ua==UnitAddress.PROGRAM)
 						return;
+
+					unitAddress = ua;
 
 					logger.info("Read from Flash ({})", unitAddress);
 
@@ -97,6 +101,10 @@ public class ReadFlashWorker {
 
 					selectionModel.select(0);
 				});
+	}
+
+	public void readFromFlash() {
+		ThreadWorker.runThread(()->Optional.ofNullable(unitAddress).ifPresent(catchConsumerException(this::readFromFlash)));
 	}
 
 	private void readFromFlash(UnitAddress unitAddress) throws SerialPortTimeoutException, SerialPortException {
@@ -168,7 +176,7 @@ public class ReadFlashWorker {
 
 	private Optional<byte[]> readBytes() throws SerialPortException, SerialPortTimeoutException {
 
-			return Optional.of(serialPort.readBytes(MAX_VAR_RAM_SIZE, 10000));
+		return Optional.of(serialPort.readBytes(MAX_VAR_RAM_SIZE, 1000));
 	}
 
 	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws SerialPortTimeoutException, SerialPortException {

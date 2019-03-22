@@ -1,6 +1,7 @@
 package irt.flash;
 
 import static irt.flash.exception.ExceptionWrapper.catchFunctionException;
+import static irt.flash.helpers.OptionalIfElse.of;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -373,14 +374,32 @@ public class FlashController {
 		btnConnect.getScene().setOnKeyReleased(
 				e->{
 
-					Optional.of(e)
-					.filter(KeyEvent::isShortcutDown)
-					.filter(v->v.getCode()==KeyCode.C)
-					.map(v->txtArea.getSelection())
-					.filter(s->s.getStart()==s.getEnd())
+					if(!e.isShortcutDown())
+						return;
+
+					final Optional<KeyEvent> oEvent = Optional.of(e);
+
+					of(
+							oEvent
+							.filter(v->v.getCode()==KeyCode.C)
+							.map(v->txtArea.getSelection())
+							.filter(s->s.getStart()==s.getEnd()))
 					.ifPresent(
 							s->{
+								e.consume();
 								btnConnect.fire();
-								e.consume(); }); }); 
+							})
+					.ifNotPresent(
+							()->{
+
+								oEvent
+								.filter(v->v.getCode()==KeyCode.R)
+								.ifPresent(
+										k->{
+											e.consume();
+											readFlashWorker.readFromFlash();
+										});
+							});
+				}); 
 	}
 }

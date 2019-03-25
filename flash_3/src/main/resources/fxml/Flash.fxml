@@ -11,7 +11,7 @@
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 
-<AnchorPane xmlns:fx="http://javafx.com/fxml/1" fx:controller="irt.flash.FlashController">
+<AnchorPane xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/10.0.1" fx:controller="irt.flash.FlashController">
    <children>
       <BorderPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
          <top>
@@ -25,7 +25,7 @@
                           </items>
                         </ContextMenu>
                      </contextMenu></ChoiceBox>
-                  <Button fx:id="btnConnect" disable="true" mnemonicParsing="false" onAction="#onConnect" text="Connect">
+                  <Button fx:id="btnConnect" defaultButton="true" disable="true" mnemonicParsing="false" onAction="#onConnect" text="Connect">
                      <cursor>
                         <Cursor fx:constant="HAND" />
                      </cursor></Button>

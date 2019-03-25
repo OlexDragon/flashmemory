@@ -103,8 +103,13 @@ public class ReadFlashWorker {
 				});
 	}
 
-	public void readFromFlash() {
+	public boolean readFromFlash() {
+
+		if(unitAddress == null)
+			return false;
+
 		ThreadWorker.runThread(()->Optional.ofNullable(unitAddress).ifPresent(catchConsumerException(this::readFromFlash)));
+		return true;
 	}
 
 	private void readFromFlash(UnitAddress unitAddress) throws SerialPortTimeoutException, SerialPortException {
@@ -113,7 +118,7 @@ public class ReadFlashWorker {
 
 				// share the UnitAddresst with uploadWorker
 			uploadWorker.setUnitAddress(unitAddress);
-			Flash3App.setUnitType(unitAddress.name());
+			Flash3App.setAppTitle(unitAddress.name());
 
 			if(serialPort == null || !serialPort.isOpened()) {
 				final String message = "Unit is not connected.";

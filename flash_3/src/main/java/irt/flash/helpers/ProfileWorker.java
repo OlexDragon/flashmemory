@@ -80,17 +80,21 @@ public class ProfileWorker {
 
 	private static String newSerialNumber;
 	private static UploadWorker uploadWorker;
+
+	private static Preferences prefs;
 	private String profile;
 
 	private static ChoiceBox<ThreadWorker> chbEdit;
-
 	private static TextField tfSerialNumber;
 	
 	public ProfileWorker(ChoiceBox<ThreadWorker> chbEdit) {
 
 		ProfileWorker.chbEdit = chbEdit;
+
 		chbEdit.getItems().add(new ThreadWorker(EDIT, null));
 		chbEdit.getSelectionModel().select(0);
+
+		prefs = Preferences.userNodeForPackage(getClass());
 	}
 
 	public static void showConfirmationDialog() {
@@ -159,9 +163,10 @@ public class ProfileWorker {
 					DeviceWorker.fillDeviceGroup(chbDeviceGroup, chbDeviceType);
 
 					final SingleSelectionModel<File> selectionModel = chbDeviceType.getSelectionModel();
-					selectionModel.selectedIndexProperty().addListener(
-							(o,oldV,newV)->{
-								okButton.setDisable(newV.intValue()<0); });
+					selectionModel.selectedIndexProperty().addListener((o,ov,nv)->okButton.setDisable(nv.intValue()<0));
+					selectionModel.selectedItemProperty().addListener((o,ov,nv)->Optional.ofNullable(prefs).ifPresent(p->p.put("selected_device_type", nv.toString())));
+
+					Optional.ofNullable(prefs).flatMap(p->Optional.ofNullable(p.get("selected_device_type", null))).map(File::new).ifPresent(f->chbDeviceType.getSelectionModel().select(f));
 
 					dialog.setResultConverter(bt->Optional.of(bt).filter(b->b==ButtonType.OK).map(b->selectionModel.getSelectedItem()).orElse(null));
 
@@ -790,88 +795,82 @@ public class ProfileWorker {
 	private Runnable editProfile() {
 		return ()->{
 
-			final Path path = UploadWorker.profile.getPath();
+			final Path profilePath = UploadWorker.profile.getPath();
 
-			if(path==null) {
+			if(profilePath==null) {
 				FlashController.showAlert("Edit profile.", "The program did not find the link to the file. Try again later or save profile.", AlertType.WARNING);
 				return;
 			}
 		
-			Optional
-			.ofNullable(UploadWorker.profile.getPath())
-			.map(Path::toFile)
-			.ifPresent(
-							p->{
-								try {
-									showProfileSetupDialog(p.toPath())
-									.ifPresent(
-											s->{
-												try {
+			try {
+				showProfileSetupDialog(profilePath)
+				.ifPresent(
+						s->{
+							try {
 
-													compareSerialNumbers(s)
-													.filter(bt->bt!=ButtonType.CANCEL)
-													.ifPresent(catchConsumerException(
-															bt->{
+								compareSerialNumbers(s)
+								.filter(bt->bt!=ButtonType.CANCEL)
+								.ifPresent(catchConsumerException(
+										bt->{
 
-														byte[] bytes;
-														File file = null;
-														final String text = bt.getText();
-														final Optional<File> oFile = Optional.of(UploadWorker.profile.getPath()).map(Path::toFile);
+									byte[] bytes;
+									File file = null;
+									final String text = bt.getText();
+									final Optional<File> oFile = Optional.of(profilePath).map(Path::toFile);
 
-														switch(text) {
+									switch(text) {
 
-														case RENAME:
+									case RENAME:
 
-															oFile.ifPresent(
-																	f->{
-																		copyFile(f, f.getName().replace(".bin", ".bak"));
-																		f.delete();
-																	});
+										oFile.ifPresent(
+												profileFile->{
+													copyFile(profileFile, profileFile.getName().replace(".bin", ".bak"));
+													profileFile.delete();
+												});
 
-														case COPY:
+									case COPY:
 
-															final String newSN = tfSerialNumber.getText().trim();
-															bytes = setSerialNumber(newSN, s);
-															file = new File(oFile.map(File::getParent).get(), newSN + ".bin");
-															logger.debug("new SN: {};", text);
-															break;
+										final String newSN = tfSerialNumber.getText().trim();
+										bytes = setSerialNumber(newSN, s);
+										file = new File(oFile.map(File::getParent).get(), newSN + ".bin");
+										logger.debug("new SN: {};", text);
+										break;
 
-														case WITHOUT_CHANGES:
+									case WITHOUT_CHANGES:
 
-															oFile.ifPresent(f->copyFile(f, f.getName().replace(".bin", ".bak")));
-															bytes = s.getBytes();
-															file = oFile.get();
-															break;
-														
-														default:
-															return;
-														}
-
-														saveAndUpload(file, s, bytes);
-													}));	//TODO edit profile
-
-												} catch (Exception e) {
-													throw new RuntimeException(e);
-												}
-											});
-								} catch (WrapperException | NoSuchFileException e) {
-
-									final NoSuchFileException noSuchFileException = getNoSuchFileException(e);
-
-									if(noSuchFileException == null) {
-										logger.catching(e);
+										oFile.ifPresent(f->copyFile(f, f.getName().replace(".bin", ".bak")));
+										bytes = s.getBytes();
+										file = oFile.get();
+										break;
+									
+									default:
 										return;
 									}
 
-									logger.catching(Level.DEBUG, e);
-									final String file = noSuchFileException.getFile();
+									saveAndUpload(file, s, bytes);
+								}));	//TODO edit profile
 
-									FlashController.showAlert("Edit profile.", "File not found: " + file, AlertType.ERROR);
+							} catch (Exception e) {
+								throw new RuntimeException(e);
+							}
+						});
+			} catch (WrapperException | NoSuchFileException e) {
 
-								} catch (Exception e) {
-									logger.catching(e);
-								}
-							});
+				final NoSuchFileException noSuchFileException = getNoSuchFileException(e);
+
+				if(noSuchFileException == null) {
+					logger.catching(e);
+					return;
+				}
+
+				logger.catching(Level.DEBUG, e);
+				final String file = noSuchFileException.getFile();
+
+				FlashController.showAlert("Edit profile.", "File not found: " + file, AlertType.ERROR);
+
+			} catch (Exception e) {
+				logger.catching(e);
+			}
 		};
 	}
 

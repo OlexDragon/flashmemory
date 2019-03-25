@@ -85,7 +85,7 @@ public class Flash3App extends Application {
 		});
 	}
 
-	public static void setUnitType(String UnitType) {
+	public static void setAppTitle(String UnitType) {
 		Optional.ofNullable(stage).ifPresent(
 				st->{
 					Platform.runLater(

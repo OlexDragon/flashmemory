@@ -42,6 +42,10 @@ import javafx.stage.FileChooser.ExtensionFilter;
 
 public class DeviceWorker {
 
+	private static final String KEY_SELECTED_DEVICE_GROUP = "selected_device_group";
+
+	private static final String TEMPLATE_PATH = "Z:\\4Olex\\flash\\templates";
+
 	private static final Logger logger = LogManager.getLogger();
 
 	public static final String DEVICE_SERIAL_NUMBER	 = "device-serial-number";
@@ -89,8 +93,14 @@ public class DeviceWorker {
 					.map(dir->dir.listFiles(((d, n) -> n.toLowerCase().endsWith(".bin"))))
 					.filter(l->l.length>0)
 					.map(FXCollections::observableArrayList)
-					.ifPresent(oal->Platform.runLater(()->chbDeviceType.setItems(oal.sorted())));
+					.ifPresent(
+							oal->{
+								Optional.ofNullable(prefs).ifPresent(p->p.put(KEY_SELECTED_DEVICE_GROUP, value.toString()));
+								Platform.runLater(()->chbDeviceType.setItems(oal.sorted()));
+							});
 				});
+
+		Optional.ofNullable(prefs).flatMap(p->Optional.ofNullable(p.get(KEY_SELECTED_DEVICE_GROUP, null))).map(File::new).ifPresent(f->chbDeviceGroup.getSelectionModel().select(f));
 	}
 
 	public void setReadData(ByteBuffer byteBuffer) {
@@ -167,9 +177,9 @@ public class DeviceWorker {
 			return;
 
 		final String pathToProfileFolder = deviceType + ".path";
-		Path programPath = Optional.ofNullable(flash3Properties.getProperty(pathToProfileFolder))
+		Path programPath = Optional.ofNullable(flash3Properties.getProperty(pathToProfileFolder)).map(Paths::get)
 
-				.map(Paths::get).orElseGet(
+				.orElseGet(
 						catchSupplierException(
 
 								()->{
@@ -206,7 +216,7 @@ public class DeviceWorker {
 
 	private static void loadFlashProperties() {
 
-		final String defaultPath = prefs.get(DEFAULT_TEMPLATE_S_PATH, "Z:\\4Olex\\flash\\templates");
+		final String defaultPath = Optional.ofNullable(prefs).map(p->p.get(DEFAULT_TEMPLATE_S_PATH, TEMPLATE_PATH)).orElse(TEMPLATE_PATH);
 		defaultDirectory = new File(defaultPath);
 
 		FutureTask<Object> task = null;
@@ -220,11 +230,11 @@ public class DeviceWorker {
 						defaultDirectory = chooser.showDialog(txtArea.getScene().getWindow());
 
 						if(defaultDirectory==null) {
-							prefs.remove(DEFAULT_TEMPLATE_S_PATH);
+							Optional.ofNullable(prefs).ifPresent(p->p.remove(DEFAULT_TEMPLATE_S_PATH));
 							return null;
 						}
 
-						prefs.put(DEFAULT_TEMPLATE_S_PATH, defaultDirectory.toString());
+						Optional.ofNullable(prefs).ifPresent(p->p.put(DEFAULT_TEMPLATE_S_PATH, defaultDirectory.toString()));
 						return null;
 					});
 		}

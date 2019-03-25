@@ -1,7 +1,6 @@
 package irt.flash;
 
 import static irt.flash.exception.ExceptionWrapper.catchFunctionException;
-import static irt.flash.helpers.OptionalIfElse.of;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,6 +42,7 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
+import javafx.scene.control.IndexRange;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.SelectionModel;
 import javafx.scene.control.SingleSelectionModel;
@@ -51,7 +51,6 @@ import javafx.scene.image.Image;
 import javafx.scene.input.DragEvent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyEvent;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
@@ -377,29 +376,28 @@ public class FlashController {
 					if(!e.isShortcutDown())
 						return;
 
-					final Optional<KeyEvent> oEvent = Optional.of(e);
+					chbUpload.hide(); chbEdit.hide(); chbRead.hide(); 
 
-					of(
-							oEvent
-							.filter(v->v.getCode()==KeyCode.C)
-							.map(v->txtArea.getSelection())
-							.filter(s->s.getStart()==s.getEnd()))
-					.ifPresent(
-							s->{
-								e.consume();
-								btnConnect.fire();
-							})
-					.ifNotPresent(
-							()->{
+					final KeyCode keyCode = e.getCode();
+					switch (keyCode) {
 
-								oEvent
-								.filter(v->v.getCode()==KeyCode.R)
-								.ifPresent(
-										k->{
-											e.consume();
-											readFlashWorker.readFromFlash();
-										});
-							});
+					case U: chbUpload.show(); chbUpload.requestFocus(); break;
+					case E: chbEdit.show(); chbEdit.requestFocus(); break;
+					case R: chbRead.show(); chbRead.requestFocus(); break;
+					case C:
+						final Optional<IndexRange> filter = Optional.of(txtArea.getSelection()).filter(s->s.getStart()==s.getEnd());
+
+						if(!filter.isPresent())
+							return;
+
+						btnConnect.fire();
+						btnConnect.requestFocus();
+						break;
+
+					default: return;
+					}
+
+					e.consume();
 				}); 
 	}
 }

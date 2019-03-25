@@ -15,6 +15,7 @@ import java.nio.charset.MalformedInputException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
@@ -57,6 +58,7 @@ import jssc.SerialPortTimeoutException;
 
 public class UploadWorker {
 
+	private static final String KEY_PROGRAM = "last_program_path";
 	private static final String OPEN_FILE_LOCATION = "Open File Location";
 	private static final String OPEN = "Open Profile";
 	private static final Logger logger = LogManager.getLogger();
@@ -92,8 +94,12 @@ public class UploadWorker {
 
 		Platform.runLater(
 				()->{
+
 					chbUpload.setItems(list);
-					selectionModel.select(0);});
+					selectionModel.select(0);
+
+					Optional.ofNullable(prefs.get(KEY_PROGRAM, null)).map(Paths::get).ifPresent(this::setProgramPath);
+				});
 
 		selectionModel.selectedItemProperty().addListener(
 				roop->{
@@ -426,7 +432,7 @@ public class UploadWorker {
 		Optional.ofNullable(path).ifPresent(
 				p->{
 
-
+					prefs.put(KEY_PROGRAM, path.toString());
 					Platform.runLater(
 							()->{
 								final int index = uploadItems.indexOf(otherProgram);

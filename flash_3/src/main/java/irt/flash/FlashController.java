@@ -29,7 +29,9 @@ import irt.flash.helpers.ReadFlashWorker;
 import irt.flash.helpers.ThreadWorker;
 import irt.flash.helpers.UploadWorker;
 import javafx.application.Platform;
+import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.value.ChangeListener;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
@@ -85,6 +87,11 @@ public class FlashController {
     	controller = this;
     	node = btnConnect;
     	baudRate = prefs.getInt(PREFS_KEY_BAUDRATE, SerialPort.BAUDRATE_115200);
+
+    	chbPorts.focusedProperty().addListener(focusListener);
+    	chbRead.focusedProperty().addListener(focusListener);
+    	chbUpload.focusedProperty().addListener(focusListener);
+    	chbEdit.focusedProperty().addListener(focusListener);
 
     	final SingleSelectionModel<UnitAddress> selectionModel = chbRead.getSelectionModel();
 		selectionModel.selectedIndexProperty().addListener(
@@ -376,18 +383,29 @@ public class FlashController {
 					if(!e.isShortcutDown())
 						return;
 
-					chbUpload.hide(); chbEdit.hide(); chbRead.hide(); 
-
 					final KeyCode keyCode = e.getCode();
 					switch (keyCode) {
 
-					case U: chbUpload.show(); chbUpload.requestFocus(); break;
-					case E: chbEdit.show(); chbEdit.requestFocus(); break;
-					case R: chbRead.show(); chbRead.requestFocus(); break;
-					case C:
-						final Optional<IndexRange> filter = Optional.of(txtArea.getSelection()).filter(s->s.getStart()==s.getEnd());
+					case U: chbUpload.show();	 chbUpload.requestFocus(); break;
+					case E: chbEdit	 .show();	 chbEdit  .requestFocus(); break;
+					case R:
 
-						if(!filter.isPresent())
+						if(readFlashWorker.readFromFlash())
+							break;
+
+						chbRead	 .show();
+						chbRead  .requestFocus();
+						break;
+					case C:
+
+						final Optional<IndexRange> filter = Optional.of(txtArea)
+
+																.filter(TextArea::isFocused)
+																.map(TextArea::getSelection)
+																.filter(s->s.getStart()!=s.getEnd());
+
+						// Return if text area is focused and has selection
+						if( filter.isPresent())
 							return;
 
 						btnConnect.fire();
@@ -400,4 +418,9 @@ public class FlashController {
 					e.consume();
 				}); 
 	}
+
+	private ChangeListener<? super Boolean> focusListener = (o,ov,nv)->{
+		if(!nv)
+			((ChoiceBox<?>)((ReadOnlyBooleanProperty)o).getBean()).hide();
+	};
 }

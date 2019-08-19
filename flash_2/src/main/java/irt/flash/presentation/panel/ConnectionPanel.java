@@ -50,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.GroupLayout;
@@ -347,7 +348,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 		textPane.addMouseMotionListener(new MouseMotionAdapter() {
 			@Override
 			public void mouseDragged(MouseEvent e) {
-				logger.error(e);
+//				logger.error(e);
 			}
 		});
 		textPane.setEditable(false);
@@ -450,9 +451,11 @@ public class ConnectionPanel extends JPanel implements Observer {
 				String newFileName = Integer.toString(calendar.get(Calendar.YEAR)).substring(2);
 				newFileName += String.format("%02d", calendar.get(Calendar.WEEK_OF_YEAR));
 
-				try {
+				try(	final Stream<Path> walk = Files.walk(Paths.get("Z:\\4alex\\boards\\profile"));) {
+
 					String fn = newFileName;
-					int sequence = Files.walk(Paths.get("Z:\\4alex\\boards\\profile"))
+					
+					int sequence = walk
 							.filter(Files::isRegularFile)
 							.map(Path::getFileName)
 							.map(Path::toString)
@@ -656,6 +659,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 					@Override
 					protected Void doInBackground() throws Exception {
+
 						if (isConnected()) {
 							if (textPane.getText().isEmpty())
 								dialog.setMessage("First Have to Read Profile.");
@@ -909,6 +913,7 @@ public class ConnectionPanel extends JPanel implements Observer {
 	}
 
 	private void uploadProgram(File file) {
+		logger.debug(file);
 		byte fileContents[] = new byte[(int) file.length()];
 
 		try (FileInputStream fileInputStream = new FileInputStream(file)) {
@@ -935,13 +940,22 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 	private String getProgramPath() {
 		String path = "\\\\192.168.2.250\\Share\\4alex\\boards\\SW release\\latest\\";
-		Object selectedItem = comboBoxUnitType.getSelectedItem();
+		path += Address.parse((String) comboBoxUnitType.getSelectedItem()).map(
+				a->{
+					switch(a) {
+					case BIAS:
+						return "picobuc.bin";
+					case CONVERTER:
+						return "fcm.bin";
+					case HP_BIAS:
+						return "hpbuc.bin";
+					default:
+						return "fcm.bin";
+					}
+				}).orElse("");
 
-		if (selectedItem.equals(Address.BIAS.toString()))
-			path += "picobuc.bin";
-		else
-			path += "fcm.bin";
 
+		logger.debug("path: {}", path);
 		return path;
 	}
 
@@ -962,19 +976,27 @@ public class ConnectionPanel extends JPanel implements Observer {
 
 			@Override
 			protected Void doInBackground() throws Exception {
-				if (isConnected()) {
+
+				final boolean connected = isConnected();
+				logger.debug("connected: {}", connected);
+				if (connected) {
+					logger.error("Yee");
 					if (textPane.getText().isEmpty())
 						dialog.setMessage("First Have to Read Profile.");
 					else {
-						String path = getProgramPath();
+						try {
+							String path = getProgramPath();
 
-						logger.trace("path={}", path);
+							logger.debug("path={}", path);
 
-						File file = new File(path);
-						if (file.exists()) {
-							uploadProgram(file);
-						} else
-							dialog.setMessage("The File do not exist.");
+							File file = new File(path);
+							if (file.exists()) {
+								uploadProgram(file);
+							} else
+								dialog.setMessage("The File do not exist.");
+						}catch (Exception e) {
+							logger.catching(e);
+						}
 					}
 				}
 				return null;

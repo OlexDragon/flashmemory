@@ -1,8 +1,10 @@
 package irt.flash.data.connection;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Observable;
@@ -172,6 +174,10 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 			return addr;
 		}
 
+		public static Optional<Address> parse(String name) {
+			return Arrays.stream(Address.values()).filter(a->a.name.equals(name)).findAny();
+		}
+
 		@Override
 		public String toString() {
 			return name;
@@ -318,7 +324,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		addEnd();
 
 		notifyObservers(new Status[] { Status.WRITING.setMessage("Erasing The Flash Memory."), Status.BUTTON.setMessage("Stop") });
-		if (eraseFlash()) {
+		if (eraseFlash(buffer.length)) {
 			notifyObservers(Status.WRITING.setMessage("Writing to The Flash Memory."));
 
 			boolean error = false;
@@ -371,25 +377,19 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		return readFrom >= buffer.length;
 	}
 
-	private boolean eraseFlash() throws IOException{
+	private boolean eraseFlash(int length) throws IOException{
 		logger.traceEntry();
 		int tmp = waitTime;
 		waitTime = 15000;
 
-		byte[] pagesToErase;
-		if (address == Address.PROGRAM)
-			pagesToErase = getProgramPages();
-		else if (address == Address.CONVERTER)
-			pagesToErase = new byte[] { 0, 10 };
-		else
-			pagesToErase = new byte[] { 0, 11 };
+		byte[] pagesToErase = getPagesToExtendedErase(address.getAddr(), length);
 
 		logger.debug("pagesToErase: {}", pagesToErase);
 
 		Answer sendCommand = sendCommand(Command.EXTENDED_ERASE);
 
 		if(sendCommand==Answer.ACK )
-			sendCommand = sendCommand(Command.USER_COMMAND.setUserCommand("Pages To Erase", addCheckSum(addLength(pagesToErase))));
+			sendCommand = sendCommand(Command.USER_COMMAND.setUserCommand("Pages To Erase", addCheckSum(pagesToErase)));
 
 		waitTime = tmp;
 
@@ -405,36 +405,47 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		return toSend;
 	}
 
-	private byte[] getProgramPages() {
-		int[] allPages = new int[] { 16 * KB, 16 * KB, 16 * KB, 16 * KB, 64 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB };
-		byte[] pagesToErase = null;
-		if (buffer != null) {
-			addEnd();
-			int length = buffer.length;
-			int pageCount = 0;
+	private byte[] getPagesToExtendedErase(int startAddress, int length) {
+		int[] allPages = new int[] { 	16 * KB, 16 * KB, 16 * KB, 16 * KB, 64 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB,
+										16 * KB, 16 * KB, 16 * KB, 16 * KB, 64 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB, 128 * KB};
 
-			for (int i : allPages)
-				if (length > 0) {
-					pageCount++;
-					length = length - i;
-				} else
-					break;
 
-			pagesToErase = new byte[pageCount * 2];
+		logger.debug("address: {}; length: {}", ()->Integer.toHexString(startAddress), ()->length);
 
-			for (int i = 0; i < pageCount; i++) {
-				byte[] b = toBytes((short) i);
-				int index = i * 2;
-				pagesToErase[index] = b[0];
-				pagesToErase[++index] = b[1];
+		int stopAddress = startAddress + length;
+		byte[] result = null;
+
+		try(ByteArrayOutputStream outputStream = new ByteArrayOutputStream()){
+			outputStream.write(0);	// The bootloader receives one half-word (two bytes) that contain N, the number of pages to be erased
+			outputStream.write(0);
+
+			int sum = Address.PROGRAM.getAddr();	//Start address
+
+			for(int page = 0; page<allPages.length && sum<stopAddress; page++) {
+
+				if(sum>=startAddress){
+					final byte[] bytes = toBytes((short) page);
+					outputStream.write(bytes); // The bootloader receives one half-word (two bytes) that contain N, the number of pages to be erased
+												//  each half-word containing a page number (coded on two bytes, MSB first).
+				}
+
+				sum += allPages[page];
 			}
 
+			result = outputStream.toByteArray();
+			final int pages = result.length/2 - 2;
+			final byte[] arrayPages = toBytes((short) pages);
+			result[0] = arrayPages[0]; // the number of pages to be erased –1.
+			result[1] = arrayPages[1]; 
+		} catch (IOException e) {
+			logger.catching(e);
 		}
-		return pagesToErase;
+
+		return result;
 	}
 
-	private byte[] toBytes(short shortToBytes) {
-		return new byte[] { (byte) (shortToBytes >> 8), (byte) shortToBytes };
+	private static byte[] toBytes(final short pages) {
+		return ByteBuffer.allocate(2).putShort(pages).array();
 	}
 
 	public void addEnd() {
@@ -447,15 +458,15 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 		}
 		logger.traceExit(buffer.length);
 	}
-
-	private byte[] addLength(byte[] pages) {
-		byte[] toSend = new byte[pages.length + 2];
-		int pageCount = pages.length / 2 - 1;
-		toSend[0] = (byte) (pageCount >> 8);
-		toSend[1] = (byte) pageCount;
-		System.arraycopy(pages, 0, toSend, 2, pages.length);
-		return toSend;
-	}
+//
+//	private byte[] addLength(byte[] pages) {
+//		byte[] toSend = new byte[pages.length + 2];
+//		int pageCount = pages.length / 2 - 1;
+//		toSend[0] = (byte) (pageCount >> 8);
+//		toSend[1] = (byte) pageCount;
+//		System.arraycopy(pages, 0, toSend, 2, pages.length);
+//		return toSend;
+//	}
 
 	private boolean readFlashMemory() throws IOException{
 		logger.traceEntry();
@@ -517,7 +528,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 	}
 
 	private Answer sendCommand(Command command) throws IOException {
-		logger.traceEntry(()->command, ()->ToHex.bytesToHex(command.toBytes()));
+		logger.debug("{} : {}", ()->command, ()->ToHex.bytesToHex(command.toBytes()));
 
 		serialPort.writeBytes(command);
 
@@ -672,7 +683,7 @@ public class MicrocontrollerSTM32 extends Observable implements Runnable {
 					break;
 				case ERASE:
 					logger.trace("ERASE");
-					eraseFlash();
+					eraseFlash(1); // one page erase
 					break;
 				case EXTENDED_ERASE:
 					logger.trace("EXTENDED_ERASE");

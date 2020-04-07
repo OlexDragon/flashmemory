@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.MalformedInputException;
 import java.nio.file.Files;
@@ -58,10 +59,11 @@ import jssc.SerialPortTimeoutException;
 
 public class UploadWorker {
 
+	private static final Logger logger = LogManager.getLogger();
+
 	private static final String KEY_PROGRAM = "last_program_path";
 	private static final String OPEN_FILE_LOCATION = "Open File Location";
 	private static final String OPEN = "Open Profile";
-	private static final Logger logger = LogManager.getLogger();
 	private static final int MAX_VAR_RAM_SIZE = ReadFlashWorker.MAX_VAR_RAM_SIZE;
 
 	private ChoiceBox<Object> chbUpload;
@@ -228,31 +230,26 @@ public class UploadWorker {
 
 		Optional.ofNullable(path).ifPresent(
 				catchConsumerException(
-						p->{
+						pathToFile->{
 
-								final byte[] fileAsBytes = Files.readAllBytes(p);
+								final byte[] fileAsBytes = Files.readAllBytes(pathToFile);
 
-								//Add signature to the end of the file.
-								Properties properties = new Properties();
-								properties.load(getClass().getResourceAsStream("/project.properties"));
-								String version = properties.getProperty("version");
-								final byte[] signature = new StringBuffer()
-
-										.append("\n#Uploaded by Flash v")
-										.append(version)
-										.append(" on ")
-										.append(new Timestamp(new Date().getTime()))
-										.append(" from ")
-										.append(InetAddress.getLocalHost().getHostName())
-										.append(" computer.")
-										.toString()
-										.getBytes();
+								//If not a program add the signature to the end of the file.
+								final byte[] signature = Optional.of(unitAddress).filter(ua->!ua.equals(UnitAddress.PROGRAM))
+														.map(ua->{
+															try {
+																return getSignature();
+															} catch (IOException e) {
+																logger.catching(e);
+															}
+															return new byte[0];
+														}).orElse(new byte[0]);
 
 								logger.debug("signature: {}", signature);
 
 								//	size should always be a multiple of 4.
-								int size = fileAsBytes.length + signature.length;
-								int sizeToWrite = Optional.of(size % 4).filter(modulus->modulus>0).map(modulus->size + modulus).orElse(size);
+								int sizeWithSignature = fileAsBytes.length + signature.length;
+								int sizeToWrite = Optional.of(sizeWithSignature % 4).filter(modulus->modulus>0).map(modulus->sizeWithSignature + modulus).orElse(sizeWithSignature);
 
 								byte[] arrayToSend = ByteBuffer
 
@@ -274,7 +271,7 @@ public class UploadWorker {
 								FlashController.closeAlert();
 
 								if(erased) {
-									logger.info("Write file to {} memory area ({})", unitAddress, p);
+									logger.info("Write file to {} memory area ({})", unitAddress, pathToFile);
 									writeToFlash(arrayToSend, addr , 0);
 								}
 
@@ -282,12 +279,31 @@ public class UploadWorker {
 						}));
 	}
 
-	private void writeToFlash(byte[] bytesToWrite, int addr, int offset) throws SerialPortException, SerialPortTimeoutException {
+	private byte[] getSignature() throws IOException, UnknownHostException {
+		Properties properties = new Properties();
+		properties.load(getClass().getResourceAsStream("/project.properties"));
+		String version = properties.getProperty("version");
+		final byte[] signature = new StringBuffer()
+
+				.append("\n#Uploaded by Flash v")
+				.append(version)
+				.append(" on ")
+				.append(new Timestamp(new Date().getTime()))
+				.append(" from ")
+				.append(InetAddress.getLocalHost().getHostName())
+				.append(" computer.")
+				.toString()
+				.getBytes();
+		return signature;
+	}
+
+	private void writeToFlash(byte[] bytesToWrite, int addr, int offset) throws SerialPortException, SerialPortTimeoutException, InterruptedException {
+		logger.debug("addr: {}; offset: {}; bytesToWrite length: {}", addr, offset, bytesToWrite.length);
 
 		FlashController.showProgressBar();
 
 		final int totalLength = bytesToWrite.length;
-		while(offset<totalLength && FlashWorker.sendCommand(serialPort, FlashCommand.WRITE_MEMORY).filter(answer->answer==FlashAnswer.ACK).isPresent()) {
+		while(offset<totalLength && FlashWorker.sendCommand(serialPort, FlashCommand.WRITE_MEMORY).filter(FlashAnswer.ACK::equals).isPresent()) {
 
 			//	Number of bytes to be received (0 < N ≤ 255);	N +1 data bytes:(Max 256 bytes)
 			int length = Optional.of(totalLength-offset).filter(l->l<MAX_VAR_RAM_SIZE).orElse(MAX_VAR_RAM_SIZE);
@@ -296,14 +312,16 @@ public class UploadWorker {
 			final byte[] byteArray = ByteBuffer.allocate(length+1).put(lengthToWrite).put(bytesToWrite, offset, length).array();
 			logger.debug("bytes to write: {}; offset: {}; byteArray.length: {}", length, offset, byteArray.length);
 
-			final Optional<byte[]> addCheckSum = FlashWorker.addCheckSum(byteArray);
-			if(!addCheckSum.isPresent()) {
+			final Optional<byte[]> withCheckSum = FlashWorker.addCheckSum(byteArray);
+			if(!withCheckSum.isPresent()) {
 				logger.error("Cannot add checksum of 0x{}", DatatypeConverter.printHexBinary(byteArray));
 				break;
 			}
 
-			byte[] bs = addCheckSum.get();
-			final Optional<FlashAnswer> oFlashAnswer = FlashWorker.addCheckSum(UnitAddress.intToBytes(addr + offset))				
+			byte[] bs = withCheckSum.get();
+			int writeTo = addr + offset;
+			logger.debug("address to write: {}", writeTo);
+			final Optional<FlashAnswer> oFlashAnswer = FlashWorker.addCheckSum(UnitAddress.intToBytes(writeTo))				
 
 					//Bytes 3 to 7: Send the address + checksum
 					.flatMap(catchFunctionException(this::writeAndWaitForAck))
@@ -439,7 +457,7 @@ public class UploadWorker {
 								uploadItems.add(index, program); }); });
 	}
 
-	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws SerialPortException, SerialPortTimeoutException {
+	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws SerialPortException, SerialPortTimeoutException, InterruptedException {
 
 			return FlashWorker.sendBytes(serialPort, bytes, 500);
 	}

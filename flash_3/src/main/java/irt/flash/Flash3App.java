@@ -124,8 +124,9 @@ public class Flash3App extends Application {
     	if(serialPortException != null && serialPortException.getMessage().contains("Port busy")) {
 
     		logger.catching(Level.DEBUG, throwable);
-			final String format = String.format(SERIAL_PORT_IS_BUSY, serialPortException.getPortName());
-			FlashController.showAlert("Connection error.", format, AlertType.ERROR);
+			final String message = String.format(SERIAL_PORT_IS_BUSY, serialPortException.getPortName());
+			logger.warn(message);
+			FlashController.showAlert("Connection error.", message, AlertType.ERROR);
 			return;
     	}
 
@@ -136,7 +137,6 @@ public class Flash3App extends Application {
     		FlashController.showAlert("Connection error.", "Connection timeout", AlertType.ERROR);
     		return;
     	}
-    	logger.error(thread);
     	logger.catching(throwable);
     };
 }

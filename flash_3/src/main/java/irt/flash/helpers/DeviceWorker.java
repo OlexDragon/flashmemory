@@ -85,7 +85,7 @@ public class DeviceWorker {
 		chbDeviceGroup.getSelectionModel().selectedItemProperty().addListener(
 				e->{
 
-					chbDeviceType.getItems().clear();
+					chbDeviceType.setItems(FXCollections.emptyObservableList());
 
 					final File value = (File) ((ReadOnlyObjectProperty<?>)e).getValue();
 

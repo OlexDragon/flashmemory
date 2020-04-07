@@ -27,6 +27,7 @@
     <Loggers>
 
 <!-- 		<logger name="irt.flash.helpers.ProfileWorker" level="all" /> -->
+<!-- 		<logger name="irt.flash.helpers.FlashWorker" level="all" /> -->
 <!-- 		<logger name="irt.flash.helpers.UploadWorker" level="all" /> -->
 
         <Root level="info">

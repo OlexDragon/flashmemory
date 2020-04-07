@@ -112,7 +112,7 @@ public class ReadFlashWorker {
 		return true;
 	}
 
-	private void readFromFlash(UnitAddress unitAddress) throws SerialPortTimeoutException, SerialPortException {
+	private void readFromFlash(UnitAddress unitAddress) throws SerialPortTimeoutException, SerialPortException, InterruptedException {
 
 		byteBuffer = null;
 
@@ -133,7 +133,7 @@ public class ReadFlashWorker {
 					deviceWorker.setReadData(byteBuffer);
 	}
 
-	private boolean readFromFlash(final int addr) throws SerialPortException, SerialPortTimeoutException{
+	private boolean readFromFlash(final int addr) throws SerialPortException, SerialPortTimeoutException, InterruptedException{
 		logger.debug("Read from address: 0x{}", ()->Integer.toHexString(addr));
 
 		Optional<byte[]> oResult = FlashWorker.sendCommand(serialPort, FlashCommand.READ_MEMORY)
@@ -184,7 +184,7 @@ public class ReadFlashWorker {
 		return Optional.of(serialPort.readBytes(MAX_VAR_RAM_SIZE, 1000));
 	}
 
-	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws SerialPortTimeoutException, SerialPortException {
+	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws SerialPortTimeoutException, SerialPortException, InterruptedException {
 
 			return FlashWorker.sendBytes(serialPort, bytes, 500);
 	}

@@ -11,7 +11,7 @@ public enum FlashAnswer {
 	ACK		((byte) 0x79),
 	NACK	((byte) 0x1F);
 
-	private final byte answer;
+	private final Byte answer;
 
 	private FlashAnswer(byte answer) {
 		this.answer = answer;
@@ -35,6 +35,6 @@ public enum FlashAnswer {
 	}
 
 	public boolean match(Byte answer) {
-		return Optional.ofNullable(answer).filter(b->b==answer).isPresent();
+		return Optional.ofNullable(answer).filter(this.answer::equals).isPresent();
 	}
 }

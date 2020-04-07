@@ -171,9 +171,10 @@ public class FlashWorker {
 	}
 
 	public static Optional<FlashAnswer> sendCommand(SerialPort serialPort, FlashCommand flashCommand) throws SerialPortException, SerialPortTimeoutException {
-		logger.entry(flashCommand);
 
-		return sendBytes(serialPort, flashCommand.toBytes(), 100);
+		Optional<FlashAnswer> answer = sendBytes(serialPort, flashCommand.toBytes(), 100);
+		logger.debug("flashCommand: {}; answer: {}", flashCommand, answer);
+		return answer;
 	}
 
 	public static Optional<FlashAnswer> sendBytes(SerialPort serialPort, byte[] bytes, int timeout) throws SerialPortException, SerialPortTimeoutException {
@@ -185,7 +186,6 @@ public class FlashWorker {
 			FlashController.showAlert("Communication error.", message, AlertType.ERROR);
 			return Optional.empty();
 		}
-
 		//Wait for ACK
 		return waitForACK(serialPort, timeout);
 	}

@@ -1,15 +1,19 @@
 package irt.flash;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.prefs.Preferences;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import irt.flash.helpers.ComPortWorker;
 import irt.flash.helpers.StageSizeAndPosition;
+import irt.flash.helpers.serial_port.ComPortWorker;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
@@ -18,6 +22,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.image.Image;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
@@ -25,6 +30,8 @@ import jssc.SerialPortTimeoutException;
 public class Flash3App extends Application {
 
 	private final static Logger logger = LogManager.getLogger();
+	private final static Preferences prefs = Preferences.userNodeForPackage(Flash3App.class);
+	public final static String IS_CLOSED_PROPERLY = "Flash3 is closed";
 
     public static void main(String[] args) throws Exception {
         launch(args);
@@ -33,7 +40,7 @@ public class Flash3App extends Application {
     private static Stage stage;
 
 	private String version;
-	private StageSizeAndPosition size = new StageSizeAndPosition(getClass());
+	private StageSizeAndPosition size = new StageSizeAndPosition();
 	public static Properties properties;
 
     @Override
@@ -41,6 +48,9 @@ public class Flash3App extends Application {
 		properties = new Properties();
 		properties.load(getClass().getResourceAsStream("/project.properties"));
 		version = properties.getProperty("version");
+
+		Thread.setDefaultUncaughtExceptionHandler((t, e) -> Platform.runLater(() -> showErrorDialog(t, e)));
+		Thread.currentThread().setUncaughtExceptionHandler(this::showErrorDialog);
 	}
 
 	public void start(Stage stage) throws Exception {
@@ -73,6 +83,8 @@ public class Flash3App extends Application {
 	public void stop() throws Exception {
 		size.saveStageProperties();
 		ComPortWorker.disconect();
+
+		prefs.putBoolean(IS_CLOSED_PROPERLY, true);
 	}
 
 	public static void setSerialNumber(String serialNumber) {
@@ -114,6 +126,28 @@ public class Flash3App extends Application {
 			return returnClass.cast(throwable);
 
 		return getException(returnClass, throwable.getCause());
+	}
+
+    private void showErrorDialog(Thread t, Throwable e) {
+    	logger.catching(e);
+
+    	StringWriter errorMsg = new StringWriter();
+    	e.printStackTrace(new PrintWriter(errorMsg));
+
+    	Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/Error.fxml"));
+
+        try {
+
+        	Parent root = loader.load();
+            ((ErrorController)loader.getController()).setErrorText(errorMsg.toString());
+            dialog.setScene(new Scene(root, 500, 400));
+            dialog.show();
+
+        } catch (IOException exc) {
+            logger.catching(exc);
+        }
 	}
 
 	public final static String SERIAL_PORT_IS_BUSY	 = "Serial port %s is busy.";

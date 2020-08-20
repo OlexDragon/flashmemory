@@ -16,6 +16,7 @@ import irt.flash.data.FlashAnswer;
 import irt.flash.data.FlashCommand;
 import irt.flash.data.UnitAddress;
 import irt.flash.exception.WrapperException;
+import irt.flash.helpers.serial_port.IrtSerialPort;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -23,8 +24,6 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.SingleSelectionModel;
 import javafx.util.StringConverter;
-import jssc.SerialPort;
-import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
 
 public class ReadFlashWorker {
@@ -38,7 +37,7 @@ public class ReadFlashWorker {
 
 	private static final int MAX_BUFFER_SIZE = 1000000;
 
-	private SerialPort serialPort;
+	private IrtSerialPort serialPort;
 	private DeviceWorker deviceWorker;
 
 	private UploadWorker uploadWorker;
@@ -112,7 +111,7 @@ public class ReadFlashWorker {
 		return true;
 	}
 
-	private void readFromFlash(UnitAddress unitAddress) throws SerialPortTimeoutException, SerialPortException, InterruptedException {
+	private void readFromFlash(UnitAddress unitAddress) throws Exception {
 
 		byteBuffer = null;
 
@@ -133,7 +132,7 @@ public class ReadFlashWorker {
 					deviceWorker.setReadData(byteBuffer);
 	}
 
-	private boolean readFromFlash(final int addr) throws SerialPortException, SerialPortTimeoutException, InterruptedException{
+	private boolean readFromFlash(final int addr) throws Exception{
 		logger.debug("Read from address: 0x{}", ()->Integer.toHexString(addr));
 
 		Optional<byte[]> oResult = FlashWorker.sendCommand(serialPort, FlashCommand.READ_MEMORY)
@@ -179,17 +178,17 @@ public class ReadFlashWorker {
 		return oResult.isPresent();
 	}
 
-	private Optional<byte[]> readBytes() throws SerialPortException, SerialPortTimeoutException {
+	private Optional<byte[]> readBytes() throws Exception {
 
-		return Optional.of(serialPort.readBytes(MAX_VAR_RAM_SIZE, 1000));
+		return Optional.of(serialPort.read(MAX_VAR_RAM_SIZE));
 	}
 
-	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws SerialPortTimeoutException, SerialPortException, InterruptedException {
+	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws Exception {
 
-			return FlashWorker.sendBytes(serialPort, bytes, 500);
+			return FlashWorker.sendBytes(serialPort, bytes);
 	}
 
-	public void setSerialPort(SerialPort serialPort) {
+	public void setSerialPort(IrtSerialPort serialPort) {
 		this.serialPort = serialPort;
 	}
 

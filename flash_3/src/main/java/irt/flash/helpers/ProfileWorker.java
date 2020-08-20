@@ -37,6 +37,7 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import irt.flash.Flash3App;
 import irt.flash.FlashController;
 import irt.flash.data.UnitAddress;
 import irt.flash.exception.WrapperException;
@@ -81,7 +82,7 @@ public class ProfileWorker {
 	private static String newSerialNumber;
 	private static UploadWorker uploadWorker;
 
-	private static Preferences prefs;
+	private final static Preferences prefs = Preferences.userNodeForPackage(Flash3App.class);
 	private String profile;
 
 	private static ChoiceBox<ThreadWorker> chbEdit;
@@ -94,7 +95,6 @@ public class ProfileWorker {
 		chbEdit.getItems().add(new ThreadWorker(EDIT, null));
 		chbEdit.getSelectionModel().select(0);
 
-		prefs = Preferences.userNodeForPackage(getClass());
 	}
 
 	public static void showConfirmationDialog() {
@@ -640,7 +640,7 @@ public class ProfileWorker {
 	}
 
 	private static synchronized void savePropertiesFile(File dir, Properties properties) throws FileNotFoundException, IOException {
-		logger.entry(dir, properties);
+		logger.traceEntry("{}; {}", dir, properties);
 
 		File saveDir = Optional.of(dir).filter(File::isDirectory).orElseGet(()->dir.getParentFile());
 		final String name = saveDir.getName();
@@ -655,7 +655,7 @@ public class ProfileWorker {
 	}
 
 	private static void copyFile(File file, String name) {
-		logger.entry(file, name);
+		logger.traceEntry("{}; {}", file, name);
 
 		Optional.ofNullable(file).filter(File::exists).ifPresent(
 				catchConsumerException(

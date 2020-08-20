@@ -34,11 +34,13 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import irt.flash.Flash3App;
 import irt.flash.FlashController;
 import irt.flash.data.FlashAnswer;
 import irt.flash.data.FlashCommand;
 import irt.flash.data.UnitAddress;
 import irt.flash.exception.WrapperException;
+import irt.flash.helpers.serial_port.IrtSerialPort;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.collections.FXCollections;
@@ -53,8 +55,6 @@ import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SingleSelectionModel;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
-import jssc.SerialPort;
-import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
 
 public class UploadWorker {
@@ -73,9 +73,9 @@ public class UploadWorker {
 	private final PathHolder program = new PathHolder();
 	private final PathHolder otherProgram = new PathHolder("Other Program");
 
-	private Preferences prefs;
+	private final static Preferences prefs = Preferences.userNodeForPackage(Flash3App.class);
 
-	private SerialPort serialPort;
+	private IrtSerialPort serialPort;
 
 	private ChoiceBox<ThreadWorker> chbEdit;
 
@@ -85,8 +85,6 @@ public class UploadWorker {
 
 		this.chbUpload= chbUpload;
 		this.chbEdit = chbEdit;
-
-		prefs = Preferences.userNodeForPackage(getClass());
 
 		list = FXCollections.observableArrayList("Upload ...", otherProfile, new SeparatorMenuItem(), otherProgram);
 		program.setUnitAddress(UnitAddress.PROGRAM);
@@ -223,7 +221,7 @@ public class UploadWorker {
 	}
 
 	public void uplodeToTheFlash(UnitAddress unitAddress, final Path path) {
-		logger.entry(unitAddress, path);
+		logger.traceEntry("{}; {}", unitAddress, path);
 
 		if(unitAddress==null)
 			return;
@@ -297,7 +295,7 @@ public class UploadWorker {
 		return signature;
 	}
 
-	private void writeToFlash(byte[] bytesToWrite, int addr, int offset) throws SerialPortException, SerialPortTimeoutException, InterruptedException {
+	private void writeToFlash(byte[] bytesToWrite, int addr, int offset) throws Exception {
 		logger.debug("addr: {}; offset: {}; bytesToWrite length: {}", addr, offset, bytesToWrite.length);
 
 		FlashController.showProgressBar();
@@ -457,9 +455,9 @@ public class UploadWorker {
 								uploadItems.add(index, program); }); });
 	}
 
-	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws SerialPortException, SerialPortTimeoutException, InterruptedException {
+	private Optional<FlashAnswer> writeAndWaitForAck(byte[] bytes) throws Exception {
 
-			return FlashWorker.sendBytes(serialPort, bytes, 500);
+			return FlashWorker.sendBytes(serialPort, bytes);
 	}
 
 	public static class PathHolder{
@@ -500,7 +498,7 @@ public class UploadWorker {
 		otherProfile.setUnitAddress(unitAddress);
 	}
 
-	public void setSerialPort(SerialPort serialPort) {
+	public void setSerialPort(IrtSerialPort serialPort) {
 		this.serialPort = serialPort;
 	}
 

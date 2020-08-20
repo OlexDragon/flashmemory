@@ -5,16 +5,13 @@ import java.awt.Toolkit;
 import java.util.Optional;
 import java.util.prefs.Preferences;
 
+import irt.flash.Flash3App;
 import javafx.stage.Stage;
 
 public class StageSizeAndPosition {
 
 	private Stage stage;
-	private Preferences prefs;
-
-	public StageSizeAndPosition(Class<?> key) {
-		prefs = Preferences.userNodeForPackage(key);
-	}
+	private final static Preferences prefs = Preferences.userNodeForPackage(Flash3App.class);
 
 	public void setStageProperties(Stage stage) {
 

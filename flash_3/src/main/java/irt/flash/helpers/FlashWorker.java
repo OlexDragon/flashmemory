@@ -15,10 +15,8 @@ import irt.flash.FlashController;
 import irt.flash.data.FlashAnswer;
 import irt.flash.data.FlashCommand;
 import irt.flash.data.UnitAddress;
+import irt.flash.helpers.serial_port.IrtSerialPort;
 import javafx.scene.control.Alert.AlertType;
-import jssc.SerialPort;
-import jssc.SerialPortException;
-import jssc.SerialPortTimeoutException;
 
 public class FlashWorker {
 
@@ -70,7 +68,7 @@ public class FlashWorker {
 		return ByteBuffer.allocate(2).putShort(pages).array();
 	}
 
-	public static Optional<FlashAnswer> erase(SerialPort serialPort, int startAddress, int length) throws IOException, SerialPortException, SerialPortTimeoutException {
+	public static Optional<FlashAnswer> erase(IrtSerialPort serialPort, int startAddress, int length) throws Exception {
 
 		final byte[] pagesToErase = getPagesToExtendedErase(startAddress, length);
 		final short pages = ByteBuffer.allocate(2).put(pagesToErase[0]).put(pagesToErase[1]).getShort(0);
@@ -83,37 +81,36 @@ public class FlashWorker {
 		final Optional<byte[]> addCheckSum = addCheckSum(pagesToErase);
 
 		if(addCheckSum.isPresent() && sendCommand(serialPort, FlashCommand.EXTENDED_ERASE).filter(answer->answer==FlashAnswer.ACK).isPresent())
-			return sendBytes(serialPort, addCheckSum.get(), timaout);
+			return sendBytes(serialPort, addCheckSum.get());
 
 		logger.debug("Cannot erase these pages({}). ", ()->DatatypeConverter.printHexBinary(addCheckSum.get()));
 		return Optional.empty();
 	}
 
-	public static boolean writeBytes(SerialPort serialPort, final byte[] bytes) throws SerialPortException {
+	public static boolean writeBytes(IrtSerialPort serialPort, final byte[] bytes) throws Exception {
 		logger.trace("size: {} - {}", bytes.length, bytes);
-		serialPort.purgePort(SerialPort.PURGE_RXABORT | SerialPort.PURGE_RXCLEAR | SerialPort.PURGE_TXABORT | SerialPort.PURGE_TXCLEAR);
 
 		return serialPort.writeBytes(bytes);
 	}
 
-	public static Optional<byte[]> getControllerID(SerialPort serialPort) throws SerialPortException, SerialPortTimeoutException {
+	public static Optional<byte[]> getControllerID(IrtSerialPort serialPort) throws Exception {
 
 		if(!sendCommand(serialPort, FlashCommand.GET_ID).filter(answer->answer==FlashAnswer.ACK).isPresent())
 			return Optional.empty();
 
-		int numberOfBytes = readByte(serialPort, 1000)&0xFF;	//	number of bytes – 1
+		int numberOfBytes = readByte(serialPort)&0xFF;	//	number of bytes – 1
 
 		return Optional
-				.of(serialPort.readBytes(++numberOfBytes, 100));
+				.of(serialPort.read(++numberOfBytes));
 	}
 
-	public static byte[] readCommand(SerialPort serialPort, int timeout) throws SerialPortException, SerialPortTimeoutException {
+	public static byte[] readCommand(IrtSerialPort serialPort, int timeout) throws Exception {
 		final byte[] toWrite = FlashCommand.READ_MEMORY.toBytes();
 		logger.debug("Command read: {}", toWrite);
 
 		writeBytes(serialPort, toWrite);
 
-		if(!waitForACK(serialPort, timeout).filter(answer->answer==FlashAnswer.ACK).isPresent())
+		if(!waitForACK(serialPort).filter(answer->answer==FlashAnswer.ACK).isPresent())
 			return null;
 
 		final UnitAddress[] addrs = UnitAddress.values();
@@ -122,35 +119,26 @@ public class FlashWorker {
 		return null;
 	}
 
-	private static int count;
-	public static Optional<FlashAnswer> waitForACK(SerialPort serialPort, int timeout) throws SerialPortException, SerialPortTimeoutException {
+	public static Optional<FlashAnswer> waitForACK(IrtSerialPort serialPort) throws Exception {
 
-		final byte readByte = readByte(serialPort, timeout);
+		final byte readByte = readByte(serialPort);
 		final Optional<FlashAnswer> oFlashAnswer = FlashAnswer.valueOf(readByte);
 
 		logger.debug(oFlashAnswer);
 
 		if(!oFlashAnswer.isPresent()) {
 
-			// Stop the process, too many attempts.
-			if(count++>7) {
-				count = 0;
-				FlashController.showAlert("Communication error.", "A lot of wrong answers", AlertType.ERROR);
-				return Optional.empty();
-			}
-
 			FlashController.showAlert("Communication error.", "Aswer is wrong: 0x" + DatatypeConverter.printHexBinary(new byte[] {readByte}), AlertType.ERROR);
 			// Trying to get the right answer again.
-			return waitForACK(serialPort, timeout);
+			return waitForACK(serialPort);
 		}else
 			oFlashAnswer.filter(a->a!=FlashAnswer.ACK).ifPresent(a->FlashController.showAlert("Communication error.", "Aswer is " + a, AlertType.ERROR));
 
-		count = 0;
 		return oFlashAnswer;
 	}
 
-	private static byte readByte(SerialPort serialPort, int timeout) throws SerialPortException, SerialPortTimeoutException {
-		return logger.traceExit(serialPort.readBytes(1, timeout)[0]);
+	private static byte readByte(IrtSerialPort serialPort) throws Exception {
+		return Optional.ofNullable(serialPort.read(1)).filter(bs->bs.length>0).map(b->b[0]).orElse((byte) 0);
 	}
 
 	public static Optional<byte[]> addCheckSum(byte... original) {
@@ -170,14 +158,14 @@ public class FlashWorker {
 		return xor;
 	}
 
-	public static Optional<FlashAnswer> sendCommand(SerialPort serialPort, FlashCommand flashCommand) throws SerialPortException, SerialPortTimeoutException {
+	public static Optional<FlashAnswer> sendCommand(IrtSerialPort serialPort, FlashCommand flashCommand) throws Exception {
 
-		Optional<FlashAnswer> answer = sendBytes(serialPort, flashCommand.toBytes(), 100);
+		Optional<FlashAnswer> answer = sendBytes(serialPort, flashCommand.toBytes());
 		logger.debug("flashCommand: {}; answer: {}", flashCommand, answer);
 		return answer;
 	}
 
-	public static Optional<FlashAnswer> sendBytes(SerialPort serialPort, byte[] bytes, int timeout) throws SerialPortException, SerialPortTimeoutException {
+	public static Optional<FlashAnswer> sendBytes(IrtSerialPort serialPort, byte[] bytes) throws Exception {
 
 		if(!writeBytes(serialPort, bytes)) {
 
@@ -187,6 +175,6 @@ public class FlashWorker {
 			return Optional.empty();
 		}
 		//Wait for ACK
-		return waitForACK(serialPort, timeout);
+		return waitForACK(serialPort);
 	}
 }

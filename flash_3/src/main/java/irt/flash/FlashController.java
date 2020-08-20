@@ -3,6 +3,9 @@ package irt.flash;
 import static irt.flash.exception.ExceptionWrapper.catchFunctionException;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +13,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
+import java.util.stream.Stream;
 
 import javax.xml.bind.DatatypeConverter;
 
@@ -21,18 +25,21 @@ import irt.flash.data.FlashAnswer;
 import irt.flash.data.FlashCommand;
 import irt.flash.data.UnitAddress;
 import irt.flash.exception.WrapperException;
-import irt.flash.helpers.ComPortWorker;
 import irt.flash.helpers.DeviceWorker;
 import irt.flash.helpers.FlashWorker;
 import irt.flash.helpers.ProfileWorker;
 import irt.flash.helpers.ReadFlashWorker;
 import irt.flash.helpers.ThreadWorker;
 import irt.flash.helpers.UploadWorker;
+import irt.flash.helpers.serial_port.ComPortWorker;
+import irt.flash.helpers.serial_port.SerialPortJssc;
+import irt.flash.helpers.serial_port.SerialPortjSerialComm;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -46,21 +53,26 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.IndexRange;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SelectionModel;
 import javafx.scene.control.SingleSelectionModel;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.image.Image;
 import javafx.scene.input.DragEvent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Region;
 import javafx.stage.Stage;
 import jssc.SerialPort;
 import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
 
 public class FlashController {
+
+	public static final int MAX_WAIT_TIME_IN_MINUTES = 1;
 
 	private final static String PREFS_KEY_BAUDRATE = "BAUDRATE";
 	private final static Logger logger = LogManager.getLogger();
@@ -72,18 +84,22 @@ public class FlashController {
     @FXML private ChoiceBox<Object> chbUpload;
     @FXML private ChoiceBox<ThreadWorker> chbEdit;
     @FXML private TextArea txtArea;
+    @FXML private RadioMenuItem menuJssc;
+    @FXML private RadioMenuItem menuJSerialComm;
 
-    private static Preferences prefs = Preferences.userNodeForPackage(FlashController.class);
+	private final static Preferences prefs = Preferences.userNodeForPackage(Flash3App.class);
+
+	private static final String SELECTED_MENU = "selected driver";
 	private static int baudRate = SerialPort.BAUDRATE_115200;
     private static Node node;
     private static FlashController controller;
 
     private ComPortWorker	 comPortWorker;
 	private Optional<byte[]> controllerID;
-	private ReadFlashWorker	 readFlashWorker;
+	private ReadFlashWorker	 readWorker;
 	private UploadWorker	 uploadWorker;
 
-    @FXML void initialize() throws IOException {
+    @FXML public void initialize() throws IOException {
     	controller = this;
     	node = btnConnect;
     	baudRate = prefs.getInt(PREFS_KEY_BAUDRATE, SerialPort.BAUDRATE_115200);
@@ -110,13 +126,13 @@ public class FlashController {
 						}));
 
     	comPortWorker = new ComPortWorker(chbPorts, btnConnect);
-    	readFlashWorker = new ReadFlashWorker(chbRead);
+    	readWorker = new ReadFlashWorker(chbRead);
 
     	final DeviceWorker deviceWorker = new DeviceWorker(txtArea);
-        readFlashWorker.setDeviceWorker(deviceWorker);
+        readWorker.setDeviceWorker(deviceWorker);
 
     	uploadWorker = new UploadWorker(chbUpload, chbEdit);
-    	readFlashWorker.setUploadWorker(uploadWorker);
+    	readWorker.setUploadWorker(uploadWorker);
     	deviceWorker.setUploadWorker(uploadWorker);
 
     	final ProfileWorker profileWorker = new ProfileWorker(chbEdit);
@@ -132,10 +148,55 @@ public class FlashController {
 					Optional.ofNullable((ThreadWorker)selectedItem).ifPresent(ThreadWorker::start);
 					sm.select(0);
     			});
+
+    	// Setup serial port menu
+    	ToggleGroup group = new ToggleGroup();
+
+    	menuJssc.setUserData(SerialPortJssc.class);
+    	menuJssc.setToggleGroup(group);
+
+    	menuJSerialComm.setUserData(SerialPortjSerialComm.class);
+    	menuJSerialComm.setToggleGroup(group);
+
+    	final Optional<String> oSelected = Optional.ofNullable(prefs.get(SELECTED_MENU, null));
+
+    	final Stream<RadioMenuItem> stream = Stream.of(menuJssc, menuJSerialComm);
+		if(oSelected.isPresent()) {
+
+    		stream.filter(mi->mi.getId().equals(prefs.get(SELECTED_MENU, null))).findAny()
+    		.ifPresent(
+    				mi->{
+    					mi.setSelected(true);
+    					ComPortWorker.setSerialPortClass((Class<?>) mi.getUserData());
+    				});
+
+		}else {
+
+			stream.filter(mi->mi.getUserData().equals(ComPortWorker.getSerialPortClass())).findAny()
+       		.ifPresent(mi->mi.setSelected(true));
+    	}
+
+		// Check if this application close properly
+		boolean guiBeenClosedProperly = prefs.getBoolean(Flash3App.IS_CLOSED_PROPERLY, true);
+
+		if(!guiBeenClosedProperly) {
+
+			ChoiceDialog<Class<?>> alert = new ChoiceDialog<>(ComPortWorker.getSerialPortClass(), SerialPortJssc.class, SerialPortjSerialComm.class);
+			alert.setTitle("The GUI was not closed properly.");
+			alert.setHeaderText("Try to select a different serial port driver.");
+			Node comboBox = (Node) alert.getDialogPane().lookup(".combo-box");
+			logger.error(comboBox);//TODO add conversation
+			Optional<Class<?>> oClass = alert.showAndWait();
+
+			if(!oClass.isPresent())
+				return;
+
+			ComPortWorker.setSerialPortClass(oClass.get());
+			stream.filter(mi->mi.getUserData().equals(ComPortWorker.getSerialPortClass())).findAny().ifPresent(mi->mi.setSelected(true));
+		}
     }
 
-    @FXML
-    void onBaudRate() {
+    @FXML public  void onBaudRate() {
     	List<Integer> choices = new ArrayList<>();
 //       	choices.add(SerialPort.BAUDRATE_110);
 //       	choices.add(SerialPort.BAUDRATE_300);
@@ -165,67 +226,90 @@ public class FlashController {
      			});
     }
 
-    @FXML void onConnect(){
+    private Thread thread;
+    @FXML public void onConnect(){
+    	Optional.ofNullable(thread).filter(Thread::isAlive).filter(t->!t.isInterrupted()).ifPresent(Thread::interrupt);
 
-    	boolean setDisable = true;
+    	thread = ThreadWorker.runThread(
+    			()->{
+    		    	boolean setDisable = true;
 
-    	try {
+    		    	try {
 
-			setDisable  = comPortWorker.conect(baudRate )
+    					setDisable  = comPortWorker.conect(baudRate )
 
-					.map(
-							catchFunctionException(
-							sp->{
-//								try {
+    							.map(
+    									catchFunctionException(
+    											sp->{
 
-									readFlashWorker.setSerialPort(sp);
-									uploadWorker.setSerialPort(sp);
-									final Optional<FlashAnswer> oAnswer = FlashWorker.sendCommand(sp, FlashCommand.CONNECT);
+    												logger.error(sp);
+    												showAlert("Connecting.", "Connection to the unit.", AlertType.INFORMATION);
 
-									if(!oAnswer.isPresent())
-										return false;
+    												readWorker.setSerialPort(sp);
+    												uploadWorker.setSerialPort(sp);
+    												final Optional<FlashAnswer> oAnswer = FlashWorker.sendCommand(sp, FlashCommand.CONNECT).filter(answer->answer.ordinal()>FlashAnswer.NULL.ordinal());
 
-									synchronized (this) { try { wait(100); } catch (InterruptedException e) { } }
+    												if(!oAnswer.isPresent()) {
+        												showAlert("Connecting.", "It is not possible to connect to the unit.", AlertType.WARNING);
+    													return true;	//disable
+    												}
 
-									//Maybe I will use this id.
-									try {
-										controllerID = FlashWorker.getControllerID(sp);
-										logger.info("controller ID: {}", controllerID.map(DatatypeConverter::printHexBinary).map(id->"0x" + id).orElse("no ID"));
-									}catch (Exception e) { }
+    												Thread.sleep(100);
+    												closeAlert();
 
-									return false;// enable
-							}))
-					.orElse(true);// disable
+    												//Maybe I will use this id.
+    												try {
+    													controllerID = FlashWorker.getControllerID(sp);
+    													final String cId = "controller ID: " + controllerID.map(DatatypeConverter::printHexBinary).map(id->"0x" + id).orElse("no ID");
+    													Flash3App.setAppTitle(cId);
+
+    												}catch (Exception e) { logger.catching(e); }
+
+    							    				return false;// enable
+    											}))
+    							.orElse(true);// disable
 
 
-    	}catch (WrapperException e) {
+    		    	}catch (WrapperException e) {
 
-    		if(e.getCause() instanceof SerialPortTimeoutException) {
+    		    		final Throwable cause = e.getCause();
 
-    			logger.catching(Level.DEBUG, e);
-    			showAlert("Connection error.", "Connection timeout", AlertType.ERROR);
+    		    		if(cause instanceof SerialPortTimeoutException) {
 
-    		}else
-    			logger.catching(e);
+    		    			logger.catching(Level.DEBUG, e);
+    		    			showAlert("Connection error.", "Connection timeout", AlertType.ERROR);
 
-    	} catch (SerialPortException e) {
+    		    		}else if(cause instanceof InterruptedException) {
 
-			if(e.getMessage().contains("Port busy")) {
+    		    			logger.catching(Level.DEBUG, e);
 
-				final String format = String.format(SERIAL_PORT_IS_BUSY, e.getPortName());
-				showAlert("Connection error.", format, AlertType.ERROR);
-				return;
+    		    		}else if(cause instanceof SerialPortException) {
 
-			}else
-				logger.catching(e);
+    		    			logger.catching(Level.DEBUG, e);
 
-    	} catch (Exception e) {
-			logger.catching(e);
-		}
-		setDisable(setDisable);
+    		    		}else
+    		    			logger.catching(e);
+
+    		    	} catch (SerialPortException e) {
+
+    					if(e.getMessage().contains("Port busy")) {
+
+    						final String format = String.format(SERIAL_PORT_IS_BUSY, e.getPortName());
+    						showAlert("Connection error.", format, AlertType.ERROR);
+    						return;
+
+    					}else
+    						logger.catching(e);
+
+    		    	} catch (Exception e) {
+    					logger.catching(e);
+    				}
+ 
+    		    	setDisable(setDisable);
+   			});
     }
 
-    @FXML void onDragOwer(DragEvent event) {
+    @FXML public void onDragOwer(DragEvent event) {
 
     	Optional.of(chbRead).filter(cb->!cb.isDisabled())
     	.map(cb->event.getDragboard())
@@ -238,8 +322,7 @@ public class FlashController {
     	event.consume();
     }
 
-    @FXML
-    void onDragDropped(DragEvent event) {
+    @FXML public void onDragDropped(DragEvent event) {
 
     	Optional.of(event.getDragboard())
     	.map(Dragboard::getFiles)
@@ -250,15 +333,24 @@ public class FlashController {
     	event.consume();
     }
 
-	void setDisable(boolean value) {
-		chbRead.setDisable(value);
-		chbUpload.setDisable(value);
-		chbEdit.setDisable(value);
+    @FXML void onDriverSelect(ActionEvent event) {
+    	RadioMenuItem source = (RadioMenuItem) event.getSource();
+    	prefs.put(SELECTED_MENU, source.getId());
+    	ComPortWorker.setSerialPortClass((Class<?>)source.getUserData());
+    }
+
+	void setDisable(final boolean disable) {
+		Platform.runLater(
+				()->{
+					chbRead.setDisable(disable);
+					chbUpload.setDisable(disable);
+					chbEdit.setDisable(disable);
+				});
 	}
 
-	public static void disable(final boolean value) {
-		logger.entry(value);
-		Optional.ofNullable(controller).ifPresent(fc->Platform.runLater(()->fc.setDisable(value)));
+	public static void disable(final boolean disable) {
+		logger.traceEntry("{}", disable);
+		Optional.ofNullable(controller).ifPresent(fc->fc.setDisable(disable));
 	}
 
 	private static Alert alert;
@@ -270,6 +362,7 @@ public class FlashController {
 						if(alert==null) {
 
 							alert = new Alert(alertType);
+							alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
 							Optional.ofNullable(node).map(Node::getScene).map(Scene::getWindow).ifPresent(alert::initOwner);
 							alert.setTitle(title);
 							alert.setHeaderText(null);
@@ -279,11 +372,27 @@ public class FlashController {
 
 						}else{
 
+							alert.setTitle(title);
 							alert.setAlertType(alertType);
 							final String contentText = alert.getContentText() + '\n';
 							alert.setContentText(contentText + message);
-
+							sizeToScene(alert);
 						}});
+	}
+
+	private static void sizeToScene(Alert alert) {
+		try {
+
+			final Field field = Dialog.class.getDeclaredField("dialog");
+			field.setAccessible(true);
+			final Object object = field.get(alert);
+			final Method method = object.getClass().getMethod("sizeToScene");
+			method.setAccessible(true);
+			method.invoke(object);
+
+		} catch (SecurityException | IllegalArgumentException | NoSuchFieldException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
+			logger.catching(e);
+		}
 	}
 
 	public static void closeAlert() {
@@ -390,7 +499,7 @@ public class FlashController {
 					case E: chbEdit	 .show();	 chbEdit  .requestFocus(); break;
 					case R:
 
-						if(readFlashWorker.readFromFlash())
+						if(readWorker.readFromFlash())
 							break;
 
 						chbRead	 .show();

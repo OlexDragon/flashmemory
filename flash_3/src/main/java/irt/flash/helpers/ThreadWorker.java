@@ -28,7 +28,8 @@ public class ThreadWorker {
 	public static Thread runThread(Runnable target) {
 
 		Thread t = new Thread(target);
-		Optional.of(t.getPriority()).filter(p->p>Thread.MIN_PRIORITY).map(p->--p).ifPresent(p->t.setPriority(p));
+		t.setDaemon(true);
+		Optional.of(t.getPriority()).filter(p->p>Thread.MIN_PRIORITY).ifPresent(p->t.setPriority(--p));
 		t.start();
 		
 		return t;
@@ -37,9 +38,7 @@ public class ThreadWorker {
 	public static <T> FutureTask<T> runFutureTask(Callable<T> callable) {
 
 		FutureTask<T> task = new FutureTask<>(callable);
-		Thread t = new Thread(task);
-		Optional.of(t.getPriority()).filter(p->p>Thread.MIN_PRIORITY).map(p->--p).ifPresent(p->t.setPriority(p));
-		t.start();
+		runThread(task);
 		
 		return task;
 	}

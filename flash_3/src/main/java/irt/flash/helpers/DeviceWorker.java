@@ -55,7 +55,8 @@ public class DeviceWorker {
 
 	private static final String DEFAULT_TEMPLATE_S_PATH = "Default Template's Path";
 
-	private static Preferences prefs;
+	private final static Preferences prefs = Preferences.userNodeForPackage(Flash3App.class);
+
 	private static TextArea txtArea;
 	private static UploadWorker uploadWorker;
 
@@ -71,7 +72,6 @@ public class DeviceWorker {
 
 		DeviceWorker.txtArea = txtArea;
 
-		prefs = Preferences.userNodeForPackage(getClass());
 		loadFlashProperties();
 	}
 

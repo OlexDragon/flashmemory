@@ -178,6 +178,7 @@ public class FlashController {
 
 		// Check if this application close properly
 		boolean guiBeenClosedProperly = prefs.getBoolean(Flash3App.IS_CLOSED_PROPERLY, true);
+		prefs.putBoolean(Flash3App.IS_CLOSED_PROPERLY, false);
 
 		if(!guiBeenClosedProperly) {
 

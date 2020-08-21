@@ -176,25 +176,34 @@ public class FlashController {
        		.ifPresent(mi->mi.setSelected(true));
     	}
 
-		// Check if this application close properly
-		boolean guiBeenClosedProperly = prefs.getBoolean(Flash3App.IS_CLOSED_PROPERLY, true);
-		prefs.putBoolean(Flash3App.IS_CLOSED_PROPERLY, false);
+		// Checking if this application is closed correctly. If not show the message.
+		Platform.runLater(
+				()->{
+					// Check if this application close properly
+					boolean guiBeenClosedProperly = prefs.getBoolean(Flash3App.IS_CLOSED_PROPERLY, true);
+					prefs.putBoolean(Flash3App.IS_CLOSED_PROPERLY, false);
 
-		if(!guiBeenClosedProperly) {
+					if(!guiBeenClosedProperly) {
 
-			ChoiceDialog<Class<?>> alert = new ChoiceDialog<>(ComPortWorker.getSerialPortClass(), SerialPortJssc.class, SerialPortjSerialComm.class);
-			alert.setTitle("The GUI was not closed properly.");
-			alert.setHeaderText("Try to select a different serial port driver.");
-			Node comboBox = (Node) alert.getDialogPane().lookup(".combo-box");
-			logger.error(comboBox);//TODO add conversation
-			Optional<Class<?>> oClass = alert.showAndWait();
+						ChoiceDialog<Class<?>> alert = new ChoiceDialog<>(ComPortWorker.getSerialPortClass(), SerialPortJssc.class, SerialPortjSerialComm.class);
+						alert.setTitle("The GUI was not closed properly.");
+						alert.setHeaderText("Try to select a different serial port driver.");
+						Node comboBox = (Node) alert.getDialogPane().lookup(".combo-box");
+						logger.error(comboBox);//TODO add conversation
+						Optional<Class<?>> oClass = alert.showAndWait();
 
-			if(!oClass.isPresent())
-				return;
+						if(!oClass.isPresent())
+							return;
 
-			ComPortWorker.setSerialPortClass(oClass.get());
-			stream.filter(mi->mi.getUserData().equals(ComPortWorker.getSerialPortClass())).findAny().ifPresent(mi->mi.setSelected(true));
-		}
+						ComPortWorker.setSerialPortClass(oClass.get());
+						Stream.of(menuJssc, menuJSerialComm).filter(mi->mi.getUserData().equals(ComPortWorker.getSerialPortClass())).findAny()
+						.ifPresent(
+								mi->{
+									mi.setSelected(true);
+									prefs.put(SELECTED_MENU, mi.getId());
+								});
+					}
+				});
     }
 
     @FXML public  void onBaudRate() {

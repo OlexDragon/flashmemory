@@ -1,7 +1,9 @@
 package irt.flash.helpers.serial_port;
 
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -45,15 +47,28 @@ public class SerialPortjSerialComm implements IrtSerialPort {
 
 						@Override
 						public void serialEvent(SerialPortEvent event) {
-							logger.traceEntry("{}", event);
+
+							if (event.getEventType() != SerialPort.LISTENING_EVENT_DATA_AVAILABLE)
+								return;
 
 							ThreadWorker.runThread(
 									()->{
-										if (event.getEventType() != SerialPort.LISTENING_EVENT_DATA_AVAILABLE)
+
+										final int bytesAvailable = serialPort.bytesAvailable();
+										if(bytesAvailable==0)
 											return;
 
-										byte[] b = new byte[serialPort.bytesAvailable()];
-										serialPort.readBytes(b, b.length);
+										final byte[] tmp = new byte[bytesAvailable];
+										serialPort.readBytes(tmp, tmp.length);
+
+										// Remove zeros
+										final int[] noZeros = IntStream.range(0, tmp.length).filter(index->tmp[index]!=0).map(index->tmp[index]&0xFF).toArray();
+
+										if(noZeros.length==0)
+											return;
+
+										final byte[] b = new byte[noZeros.length];
+										IntStream.range(0, b.length).forEach(index->b[index]=(byte) noZeros[index]);
 
 										synchronized (serialPort) {
 											if(buffer==null)
@@ -68,7 +83,7 @@ public class SerialPortjSerialComm implements IrtSerialPort {
 
 										synchronized(SerialPortjSerialComm.this){
 											SerialPortjSerialComm.this.notify();
-											logger.debug("notify(); buffer: {}", buffer);
+											logger.debug("notify();\n buffer: {},\n new bytes: {};\n", buffer, b);
 										}
 									});
 
@@ -95,26 +110,35 @@ public class SerialPortjSerialComm implements IrtSerialPort {
 	@Override
 	public boolean writeBytes(byte[] bytes) throws Exception {
 		logger.traceEntry("{}", bytes);
-		buffer = null; //clear buffer
+		synchronized (serialPort) {
+			buffer = null; //clear buffer
+		}
 		final int writeBytes = serialPort.writeBytes(bytes, bytes.length);
 		return writeBytes>0;
 	}
 
 	@Override
 	public byte[] read(int size) throws Exception {
-		logger.traceEntry("size: {};  buffer: {}", size, buffer);
+		logger.traceEntry("read {} bites from buffer: {}", size, buffer);
 
 		if(size<=0)
 			size = Integer.MAX_VALUE;
 
 		final long start = System.currentTimeMillis();
 		long elapsed = 0;
-		final int waitTime = (int) TimeUnit.MINUTES.toMillis(FlashController.MAX_WAIT_TIME_IN_MINUTES);
+		final long min = TimeUnit.SECONDS.toMillis(FlashController.MIN_WAIT_TIME_IN_SECONDS);
+		final long max = TimeUnit.MINUTES.toMillis(FlashController.MAX_WAIT_TIME_IN_MINUTES);
+		final int waitTime = Optional.of(size*min).filter(time->time<max).orElse(max).intValue();
 
-			synchronized (this) {
 		while((buffer==null || buffer.length<size) && (elapsed=(System.currentTimeMillis()-start))<waitTime) {
 
-				wait(waitTime - elapsed);
+			final long timeout = waitTime - elapsed;
+//		logger.error("timeout: {}; size to read: {}; buffer.length: {}", timeout, size, Optional.ofNullable(buffer).map(b->b.length).orElse(null));
+			if(timeout<=0)
+				break;
+
+			synchronized (this) {
+				wait(timeout);
 			}
 		}
 
@@ -132,8 +156,8 @@ public class SerialPortjSerialComm implements IrtSerialPort {
 			buffer = Arrays.copyOfRange(buffer, size, buffer.length);
 		}
 
+		logger.debug("to read: {}; result: {}; buffer: {}", size, result, buffer);
 
 		return result;
 	}
-
 }

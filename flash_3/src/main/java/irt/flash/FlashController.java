@@ -49,6 +49,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.IndexRange;
@@ -66,12 +67,14 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Region;
 import javafx.stage.Stage;
+import javafx.util.StringConverter;
 import jssc.SerialPort;
 import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
 
 public class FlashController {
 
+	public static final int MIN_WAIT_TIME_IN_SECONDS = 1;
 	public static final int MAX_WAIT_TIME_IN_MINUTES = 1;
 
 	private final static String PREFS_KEY_BAUDRATE = "BAUDRATE";
@@ -99,7 +102,7 @@ public class FlashController {
 	private ReadFlashWorker	 readWorker;
 	private UploadWorker	 uploadWorker;
 
-    @FXML public void initialize() throws IOException {
+	@FXML public void initialize() throws IOException {
     	controller = this;
     	node = btnConnect;
     	baudRate = prefs.getInt(PREFS_KEY_BAUDRATE, SerialPort.BAUDRATE_115200);
@@ -177,34 +180,45 @@ public class FlashController {
     	}
 
 		// Checking if this application is closed correctly. If not show the message.
+		closedCorrectly(prefs, Flash3App.IS_CLOSED_PROPERLY);
+    }
+
+	@SuppressWarnings("unchecked")
+	private void closedCorrectly(Preferences prefs, String properyKey) {
 		Platform.runLater(
 				()->{
 					// Check if this application close properly
-					boolean guiBeenClosedProperly = prefs.getBoolean(Flash3App.IS_CLOSED_PROPERLY, true);
-					prefs.putBoolean(Flash3App.IS_CLOSED_PROPERLY, false);
+					boolean guiBeenClosedProperly = prefs.getBoolean(properyKey, true);
+					prefs.putBoolean(properyKey, false);
 
-					if(!guiBeenClosedProperly) {
+					if(guiBeenClosedProperly)
+						return;
 
-						ChoiceDialog<Class<?>> alert = new ChoiceDialog<>(ComPortWorker.getSerialPortClass(), SerialPortJssc.class, SerialPortjSerialComm.class);
-						alert.setTitle("The GUI was not closed properly.");
-						alert.setHeaderText("Try to select a different serial port driver.");
-						Node comboBox = (Node) alert.getDialogPane().lookup(".combo-box");
-						logger.error(comboBox);//TODO add conversation
-						Optional<Class<?>> oClass = alert.showAndWait();
+					ChoiceDialog<Class<?>> alert = new ChoiceDialog<>(ComPortWorker.getSerialPortClass(), SerialPortJssc.class, SerialPortjSerialComm.class);
+					alert.setTitle("The GUI was not closed properly.");
+					alert.setHeaderText("Try to select a different serial port driver.");
+					ComboBox<Class<?>> comboBox = (ComboBox<Class<?>>) alert.getDialogPane().lookup(".combo-box");
 
-						if(!oClass.isPresent())
-							return;
+					comboBox.setConverter(
+							new StringConverter<Class<?>>() {
+						
+								@Override public String toString(Class<?> clazz) { return clazz.getSimpleName(); }
+								@Override public Class<?> fromString(String string) { return null; }
+							});
 
-						ComPortWorker.setSerialPortClass(oClass.get());
-						Stream.of(menuJssc, menuJSerialComm).filter(mi->mi.getUserData().equals(ComPortWorker.getSerialPortClass())).findAny()
-						.ifPresent(
-								mi->{
-									mi.setSelected(true);
-									prefs.put(SELECTED_MENU, mi.getId());
-								});
-					}
+					Optional<Class<?>> oClass = alert.showAndWait();
+					if(!oClass.isPresent())
+						return;
+
+					ComPortWorker.setSerialPortClass(oClass.get());
+					Stream.of(menuJssc, menuJSerialComm).filter(mi->mi.getUserData().equals(ComPortWorker.getSerialPortClass())).findAny()
+					.ifPresent(
+							mi->{
+								mi.setSelected(true);
+								prefs.put(SELECTED_MENU, mi.getId());
+							});
 				});
-    }
+	}
 
     @FXML public  void onBaudRate() {
     	List<Integer> choices = new ArrayList<>();
@@ -252,7 +266,6 @@ public class FlashController {
     									catchFunctionException(
     											sp->{
 
-    												logger.error(sp);
     												showAlert("Connecting.", "Connection to the unit.", AlertType.INFORMATION);
 
     												readWorker.setSerialPort(sp);

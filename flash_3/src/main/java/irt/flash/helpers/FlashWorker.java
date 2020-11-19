@@ -124,13 +124,14 @@ public class FlashWorker {
 		final byte readByte = readByte(serialPort);
 		final Optional<FlashAnswer> oFlashAnswer = FlashAnswer.valueOf(readByte);
 
-		logger.debug(oFlashAnswer);
+		logger.debug(()->oFlashAnswer);
 
 		if(!oFlashAnswer.isPresent()) {
 
-			FlashController.showAlert("Communication error.", "Aswer is wrong: 0x" + DatatypeConverter.printHexBinary(new byte[] {readByte}), AlertType.ERROR);
+			ThreadWorker.runThread(()->FlashController.showAlert("Communication error.", "Answer is wrong: 0x" + DatatypeConverter.printHexBinary(new byte[] {readByte}), AlertType.ERROR));
 			// Trying to get the right answer again.
 			return waitForACK(serialPort);
+
 		}else
 			oFlashAnswer.filter(a->a!=FlashAnswer.ACK).ifPresent(a->FlashController.showAlert("Communication error.", "Aswer is " + a, AlertType.ERROR));
 
@@ -159,13 +160,12 @@ public class FlashWorker {
 	}
 
 	public static Optional<FlashAnswer> sendCommand(IrtSerialPort serialPort, FlashCommand flashCommand) throws Exception {
-
-		Optional<FlashAnswer> answer = sendBytes(serialPort, flashCommand.toBytes());
-		logger.debug("flashCommand: {}; answer: {}", flashCommand, answer);
-		return answer;
+		logger.traceEntry("flashCommand: {};", flashCommand);
+		return sendBytes(serialPort, flashCommand.toBytes());
 	}
 
 	public static Optional<FlashAnswer> sendBytes(IrtSerialPort serialPort, byte[] bytes) throws Exception {
+		logger.traceEntry("{}", bytes);
 
 		if(!writeBytes(serialPort, bytes)) {
 

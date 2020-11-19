@@ -28,10 +28,11 @@
 
 <!-- 		<logger name="irt.flash.helpers.ProfileWorker" level="all" /> -->
 <!-- 		<logger name="irt.flash.helpers.FlashWorker" level="all" /> -->
-<!-- 		<logger name="irt.flash.helpers.serial_port.SerialPortjSerialComm" level="all" /> -->
+<!-- 		<logger name="irt.flash.helpers.ReadFlashWorker" level="all" /> -->
 <!-- 		<logger name="irt.flash.helpers.UploadWorker" level="all" /> -->
+<!-- 		<logger name="irt.flash.helpers.serial_port.SerialPortjSerialComm" level="all" /> -->
 
-        <Root level="info">
+        <Root level="error">
             <AppenderRef ref="ConsoleAppender" />
 			<AppenderRef ref="LogFile" />
         </Root>

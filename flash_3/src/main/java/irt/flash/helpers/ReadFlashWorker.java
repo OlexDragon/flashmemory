@@ -112,6 +112,7 @@ public class ReadFlashWorker {
 	}
 
 	private void readFromFlash(UnitAddress unitAddress) throws Exception {
+		logger.traceEntry();
 
 		byteBuffer = null;
 

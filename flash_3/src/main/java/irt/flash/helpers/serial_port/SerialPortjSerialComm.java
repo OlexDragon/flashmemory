@@ -63,6 +63,8 @@ public class SerialPortjSerialComm implements IrtSerialPort {
 
 										// Remove zeros
 										final int[] noZeros = IntStream.range(0, tmp.length).filter(index->tmp[index]!=0).map(index->tmp[index]&0xFF).toArray();
+										if(noZeros.length!=tmp.length)
+											logger.warn("Serial port receive zeros: \n received\n  {}\n Filtered\n  {}", tmp, noZeros);
 
 										if(noZeros.length==0)
 											return;

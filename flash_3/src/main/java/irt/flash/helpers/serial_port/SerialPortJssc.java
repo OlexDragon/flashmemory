@@ -19,7 +19,12 @@ public class SerialPortJssc extends SerialPort implements IrtSerialPort {
 	}
 
 	@Override
-	public byte[] read(int byteCount) throws Exception{
-		return super.readBytes(byteCount, (int) TimeUnit.MINUTES.toMillis(FlashController.MAX_WAIT_TIME_IN_MINUTES));
+	public byte[] read(int size) throws Exception{
+		return readBytes(size, (int) TimeUnit.MINUTES.toMillis(FlashController.MAX_WAIT_TIME_IN_MINUTES));
+	}
+
+	@Override
+	public byte[] read(int size, int timeout) throws Exception {
+		return super.readBytes(size, timeout);
 	}
 }

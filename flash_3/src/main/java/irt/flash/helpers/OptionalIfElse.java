@@ -12,9 +12,14 @@ public class OptionalIfElse<T> {
 		this.optional = optional;
 	}
 
-	public static <T> OptionalIfElse<T> of(Optional<T> optional) {
-		return  new OptionalIfElse<T>(optional);
-	}
+	public OptionalIfElse<T> ifPresentOrNot(Consumer<T> ifPresent, Runnable ifNotPresent) {
+
+		if (optional.isPresent())
+            return ifPresent(ifPresent);
+
+		else
+        	return ifNotPresent(ifNotPresent);
+    }
 
 	public OptionalIfElse<T> ifPresent(Consumer<T> c) {
         optional.ifPresent(c);
@@ -59,4 +64,12 @@ public class OptionalIfElse<T> {
     	}
     	return this;
     }
+
+	public static <T> OptionalIfElse<T> of(T value) {
+		return of(Optional.ofNullable(value));
+	}
+
+	public static <T> OptionalIfElse<T> of(Optional<T> optional) {
+		return  new OptionalIfElse<T>(optional);
+	}
 }

@@ -9,7 +9,6 @@ import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.MalformedInputException;
@@ -21,6 +20,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.Callable;
@@ -60,6 +60,14 @@ import jssc.SerialPortTimeoutException;
 public class UploadWorker {
 
 	private static final Logger logger = LogManager.getLogger();
+
+	public static final String COMPUTERNAME;
+	static {
+
+		Map<String, String> env = System.getenv();
+		logger.info(env);
+		COMPUTERNAME = Optional.ofNullable(env.get("COMPUTERNAME")).orElse(env.get("HOSTNAME"));
+	}
 
 	private static final String KEY_PROGRAM = "last_program_path";
 	private static final String OPEN_FILE_LOCATION = "Open File Location";
@@ -269,11 +277,18 @@ public class UploadWorker {
 								FlashController.closeAlert();
 
 								if(erased) {
+
 									logger.info("Write file to {} memory area ({})", unitAddress, pathToFile);
 									writeToFlash(arrayToSend, addr , 0);
+
+									FlashController.showAlert("Upload to the flash.", "The file " + path.getFileName() + " has been loaded into the memory area of the " + unitAddress + ".", AlertType.INFORMATION);
+
+								}else {
+
+									logger.warn("Flash memory cannot be erased. Controller did not return 'ACK'");
+									FlashController.showAlert("Upload to the flash error.", "Flash memory cannot be erased.", AlertType.ERROR);
 								}
 
-								FlashController.showAlert("Upload to the flash.", "The file " + path.getFileName() + " has been loaded into the memory area of the " + unitAddress + ".", AlertType.INFORMATION);
 						}));
 	}
 
@@ -288,7 +303,7 @@ public class UploadWorker {
 				.append(" on ")
 				.append(new Timestamp(new Date().getTime()))
 				.append(" from ")
-				.append(InetAddress.getLocalHost().getHostName())
+				.append(COMPUTERNAME)
 				.append(" computer.")
 				.toString()
 				.getBytes();
@@ -439,6 +454,7 @@ public class UploadWorker {
 	}
 
 	public void setProgramPath(Path path) {
+		logger.traceEntry("{}", path);
 
 		final ObservableList<Object> uploadItems = chbUpload.getItems();
 

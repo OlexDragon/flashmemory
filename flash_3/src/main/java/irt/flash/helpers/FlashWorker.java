@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 import javax.xml.bind.DatatypeConverter;
@@ -77,13 +78,17 @@ public class FlashWorker {
 
 		logger.info("startAddress: 0x{}, length: {}, pages: {}, timeout: {}, pagesToErase: {}", Integer.toHexString(startAddress), length, numberOfPagies, timaout, pagesToErase);
 
+		final Optional<byte[]> withCheckSum = addCheckSum(pagesToErase);
 
-		final Optional<byte[]> addCheckSum = addCheckSum(pagesToErase);
+		if(withCheckSum.isPresent() && sendCommand(serialPort, FlashCommand.EXTENDED_ERASE).filter(answer->answer==FlashAnswer.ACK).isPresent()) {
 
-		if(addCheckSum.isPresent() && sendCommand(serialPort, FlashCommand.EXTENDED_ERASE).filter(answer->answer==FlashAnswer.ACK).isPresent())
-			return sendBytes(serialPort, addCheckSum.get());
+			if(writeBytes(serialPort, withCheckSum.get()))
+				return waitForEarase(serialPort);
 
-		logger.debug("Cannot erase these pages({}). ", ()->DatatypeConverter.printHexBinary(addCheckSum.get()));
+			return Optional.empty();
+		}
+
+		logger.debug("Cannot erase these pages({}). ", ()->DatatypeConverter.printHexBinary(withCheckSum.get()));
 		return Optional.empty();
 	}
 
@@ -122,6 +127,16 @@ public class FlashWorker {
 	public static Optional<FlashAnswer> waitForACK(IrtSerialPort serialPort) throws Exception {
 
 		final byte readByte = readByte(serialPort);
+		return toOptional(serialPort, readByte);
+	}
+
+	public static Optional<FlashAnswer> waitForEarase(IrtSerialPort serialPort) throws Exception {
+
+		final byte readByte = readByte(serialPort, (int) TimeUnit.MINUTES.toMillis(FlashController.MAX_WAIT_TIME_IN_MINUTES));
+		return toOptional(serialPort, readByte);
+	}
+
+	public static Optional<FlashAnswer> toOptional(IrtSerialPort serialPort, final byte readByte) throws Exception {
 		final Optional<FlashAnswer> oFlashAnswer = FlashAnswer.valueOf(readByte);
 
 		logger.debug(()->oFlashAnswer);
@@ -136,6 +151,10 @@ public class FlashWorker {
 			oFlashAnswer.filter(a->a!=FlashAnswer.ACK).ifPresent(a->FlashController.showAlert("Communication error.", "Aswer is " + a, AlertType.ERROR));
 
 		return oFlashAnswer;
+	}
+
+	private static byte readByte(IrtSerialPort serialPort, int timeout) throws Exception {
+		return Optional.ofNullable(serialPort.read(1, timeout)).filter(bs->bs.length>0).map(b->b[0]).orElse((byte) 0);
 	}
 
 	private static byte readByte(IrtSerialPort serialPort) throws Exception {

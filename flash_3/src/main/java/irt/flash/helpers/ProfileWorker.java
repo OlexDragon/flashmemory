@@ -10,23 +10,29 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Scanner;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
+import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
@@ -40,6 +46,7 @@ import org.apache.logging.log4j.Logger;
 import irt.flash.Flash3App;
 import irt.flash.FlashController;
 import irt.flash.data.UnitAddress;
+import irt.flash.exception.RannableThrowing;
 import irt.flash.exception.WrapperException;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -63,9 +70,12 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.RowConstraints;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Window;
+import javafx.util.Pair;
 import javafx.util.StringConverter;
 
 public class ProfileWorker {
+
+	private static final String LINE_SEPARATOR = System.lineSeparator();
 
 	private static final Logger logger = LogManager.getLogger();
 
@@ -82,6 +92,8 @@ public class ProfileWorker {
 	private static String newSerialNumber;
 	private static UploadWorker uploadWorker;
 
+	private static Boolean isFrequencyConverter;
+
 	private final static Preferences prefs = Preferences.userNodeForPackage(Flash3App.class);
 	private String profile;
 
@@ -94,7 +106,6 @@ public class ProfileWorker {
 
 		chbEdit.getItems().add(new ThreadWorker(EDIT, null));
 		chbEdit.getSelectionModel().select(0);
-
 	}
 
 	public static void showConfirmationDialog() {
@@ -142,7 +153,7 @@ public class ProfileWorker {
 					grid.add(label, 0, 1);
 
 					final StringConverter<File> converter = new StringConverter<File>() {
-						
+
 						@Override
 						public String toString(File file) {
 							return file.getName();
@@ -164,21 +175,31 @@ public class ProfileWorker {
 
 					final SingleSelectionModel<File> selectionModel = chbDeviceType.getSelectionModel();
 					selectionModel.selectedIndexProperty().addListener((o,ov,nv)->okButton.setDisable(nv.intValue()<0));
-					selectionModel.selectedItemProperty().addListener((o,ov,nv)->Optional.ofNullable(prefs).ifPresent(p->p.put("selected_device_type", nv.toString())));
+
+					selectionModel.selectedItemProperty()
+					.addListener(
+							(o,ov,nv)->
+							Optional.ofNullable(prefs)
+							.ifPresent(
+									p->{
+
+										if(nv==null)
+											p.remove("selected_device_type");
+										else
+											p.put("selected_device_type", nv.toString());
+									}));
 
 					Optional.ofNullable(prefs).flatMap(p->Optional.ofNullable(p.get("selected_device_type", null))).map(File::new).ifPresent(f->chbDeviceType.getSelectionModel().select(f));
 
 					dialog.setResultConverter(bt->Optional.of(bt).filter(b->b==ButtonType.OK).map(b->selectionModel.getSelectedItem()).orElse(null));
 
-					showProfileSetup(dialog.showAndWait());
-
+					dialog.showAndWait().ifPresent(showProfileSetup());
 				});
 	}
 
-	private static void showProfileSetup(Optional<File> oProfile) {
+	private static Consumer<? super File> showProfileSetup() {
 
-		oProfile.ifPresent(
-
+		return 
 				profile->{
 
 					// Get the directory where create new unit profile
@@ -186,6 +207,7 @@ public class ProfileWorker {
 					final Properties properties = propertiesFrom(dir);
 					final String propertyName = profile.getName();
 
+					// get profile directory from properties
 					final File saveDirectory = Optional.ofNullable(properties.getProperty(propertyName))
 
 							.filter(saveDir->!saveDir.isEmpty())
@@ -193,41 +215,158 @@ public class ProfileWorker {
 							.filter(File::exists)
 							.orElseGet(()->chooseDirectory(propertyName, profile, properties));
 
+					// Return if properties do not contain profile directory
 					if(saveDirectory==null)
 						return;
 
-					ThreadWorker.runThread(()->{
-						try {
+					ThreadWorker.runThread(
+							()->{
+								try {
 
-							showProfileSetupDialog(profile.toPath())
-							.ifPresent(
-									catchConsumerException(
-											profileToWrite->{
-												String serialNumber = Optional.of(tfSerialNumber)
+									showProfileSetupDialog(profile.toPath())
+									.ifPresent(
+											catchConsumerException(
+													profileToWrite->{
+														String serialNumber = Optional.of(tfSerialNumber)
 
-														.map(tf->tf.getText().trim())
-														.filter(t->!t.isEmpty())
-														.orElseGet(catchSupplierException(()->waitForSerialNumber(tfSerialNumber)));
+																.map(tf->tf.getText().trim())
+																.filter(t->!t.isEmpty())
+																.orElseGet(catchSupplierException(()->waitForSerialNumber(tfSerialNumber)));
 
-												if(serialNumber==null)
-													return;
+														if(serialNumber==null)
+															return;
 
-												final byte[] bytes = setSerialNumber(serialNumber, profileToWrite);
-												final File file = new File(saveDirectory, serialNumber + ".bin");
-												logger.debug("Write to the file {}", file);
+														final byte[] bytes = setSerialNumber(serialNumber, profileToWrite);
+//														if(!isFrequencyConverter)
+//															profileToWrite = setMacAddress(serialNumber, profileToWrite);
+														final File file = new File(saveDirectory, serialNumber + ".bin");
 
-												saveAndUpload(file, profileToWrite, bytes);
-											}));
+													 	saveAndUpload(file, profileToWrite, bytes);
+													}));
 
-						} catch (Exception e) {
-							logger.catching(e);
-						}
-					});
-				});
+								} catch (Exception e) {
+									logger.catching(e);
+								}
+							});
+				};
+	}
+
+	@SuppressWarnings("unused")
+	private static String setMacAddress(String serialNumber, String profileToWrite) {
+
+		StringBuilder sb = new StringBuilder();
+		Pair<Boolean, String> pair = getMacAddress(serialNumber);
+		String mac = pair.getValue();
+
+		String partNumber = "N/A";
+		try(final Scanner scanner = new Scanner(profileToWrite);){
+			while(scanner.hasNext()) {
+
+				final String nextLine = scanner.nextLine();
+
+				if(nextLine.startsWith("device-part-number")) 
+					partNumber = nextLine.split("\\s++")[1];
+
+				if(nextLine.startsWith("device-part-number")) 
+					partNumber = nextLine.split("\\s++")[1];
+
+				if(nextLine.startsWith("mac-address"))
+					sb.append("mac-address " + mac).append(LINE_SEPARATOR);
+				else
+					sb.append(nextLine).append(LINE_SEPARATOR);
+			}
+		}
+
+		Optional.of(pair).filter(p->p.getKey()).ifPresent(saveToMacHistory(serialNumber, partNumber));
+
+		return sb.toString();
+	}
+
+	private final static SimpleDateFormat dateFormat = new SimpleDateFormat("MMMMM dd, yyyy HH:mm 'W'w");
+	private final static String format = "%s [%s] %s %s - by %s";
+	private static Consumer<? super Pair<Boolean, String>> saveToMacHistory(String serialNumber, String partNumber) {
+
+		return pair->{
+
+			final String mac = pair.getValue();
+			Optional.of(Flash3App.properties.getProperty("mac_file_history")).map(Paths::get).map(Path::toFile).map(catchFunctionException(file->new FileWriter(file, true)))
+			.ifPresent(catchConsumerException(
+
+					fileWriter->{
+						final String toWrite = String.format(format, serialNumber, partNumber, mac, dateFormat.format(new Date()), UploadWorker.COMPUTERNAME);
+						logger.error(toWrite);
+						fileWriter.write(toWrite);
+						fileWriter.close();
+					}));
+
+			Optional.of(Flash3App.properties.getProperty("mac_file_history")).map(Paths::get).map(Path::toFile).map(catchFunctionException(FileWriter::new))
+			.ifPresent(catchConsumerException(
+
+					fileWriter->{
+						fileWriter.write(mac);
+						fileWriter.close();
+					}));
+		};
+	}
+
+	/**
+	 * @param serialNumber
+	 * @return true - created new serial number; false - serial number taken from history
+	 */
+	public static Pair<Boolean, String> getMacAddress(String serialNumber) {
+
+		final Optional<Properties> oProperties = Optional.of(Flash3App.properties);
+
+		// Get MAC address by serial number from history file
+		return oProperties
+
+				.map(p->p.getProperty("mac_file_history"))
+				.map(Paths::get)
+				.map(catchFunctionException(path->Files.lines(path, StandardCharsets.ISO_8859_1)))
+				.orElse(Stream.empty())
+				.filter(line->line.startsWith(serialNumber))
+				.findAny()
+				.map(line->line.substring(line.indexOf("] ")+2).split("\\s++", 2)[0])
+				.map(mac->new Pair<>(false, mac))
+
+				// Create new MAC Address
+				.orElseGet(()->oProperties
+						.map(p->p.getProperty("mac_file_last"))
+						.map(Paths::get)
+						.map(catchFunctionException(Files::readAllLines))
+						.map(list->list.get(0))
+						.map(m->m.replaceAll(":", ""))
+						.map(m->Long.parseLong(m, 16) + 1)
+						.map(Long::toHexString)
+						.map(StringBuilder::new)
+						.map(ProfileWorker::addZeroToFront)
+						.map(ProfileWorker::insertColons)
+						.map(Object::toString)
+						.map(mac->new Pair<>(true, mac))
+						.orElseThrow(()->new NullPointerException()));
+	}
+
+	private static StringBuilder addZeroToFront(StringBuilder sb) {
+	
+		if(sb.length()>=12)
+			return sb;
+
+		return addZeroToFront(sb.insert(0, '0'));
+	}
+
+	private static StringBuilder insertColons(StringBuilder sb) {
+	
+		for(int i=2; i<15; i+=3)
+			sb.insert(i, ":");
+
+		return sb;
 	}
 
 	private static void saveAndUpload(final File file, String profileToWrite, final byte[] bytes) throws IOException {
-		getUnitAddress(profileToWrite).ifPresent(
+		logger.traceEntry("\n File: {}\nprofileToWrite: {}\n bytes: {}", file, profileToWrite, bytes);
+
+		getUnitAddress(profileToWrite)
+		.ifPresent(
 				unitAddress->{
 
 					ThreadWorker.runThread(
@@ -253,7 +392,7 @@ public class ProfileWorker {
 
 	private static Optional<String> showProfileSetupDialog(Path profilePath) throws InterruptedException, ExecutionException, IOException {
 
-		Boolean isFrequencyConverter = isFrequencyConverter(profilePath);
+		isFrequencyConverter = isFrequencyConverter(profilePath);
 
 		if(isFrequencyConverter==null)
 			return Optional.empty();
@@ -265,39 +404,15 @@ public class ProfileWorker {
 				(o,ov,nv)->Optional.ofNullable(newSerialNumber).filter(nsn->nv.isEmpty()).ifPresent(nsn->tfSerialNumber.setText(nsn)));
 
 		//set Serial Number from profile
-		ThreadWorker.runThread(
-				catchRunnableException(
-						()->getSerialNumber(profilePath).ifPresent(
-								sn->
-								Platform.runLater(
-										()->{
-											tfSerialNumber.setText(sn);
-											tfSerialNumber.addEventFilter(KeyEvent.KEY_PRESSED,
-													e->{
-														// on ESCAPE put back serial number from profile
-														if (e.getCode() == KeyCode.ESCAPE) {
-															e.consume();
-															tfSerialNumber.setText(sn);
-														}
-
-													}); }))));
+		ThreadWorker.runThread(catchRunnableException(getSerialNamberFromProfile(profilePath)));
 
 		//set Serial Number automatically
-		ThreadWorker.runThread(
-				catchRunnableException(
-						()->{
-							newSerialNumber = getSerialNumberAutomatically(isFrequencyConverter);
-							Platform.runLater(
-									()->
-									Optional.ofNullable(tfSerialNumber)
-									.filter(tf-> tf.getText().isEmpty())
-									.ifPresent(tf->tf.setText(newSerialNumber)));
-						}));
+		ThreadWorker.runThread(catchRunnableException(getNewSerialNunber(isFrequencyConverter)));
 
 
 		return ThreadWorker.runFxFutureTask(()->{
 
-			final GridPane grid = gridWithSerialNumber(tfSerialNumber);
+			final GridPane grid = createGridWithSerialNumberField(tfSerialNumber);
 
 			final List<PropertyLine> fieldsToEdit = getFieldsToEdit(profilePath);
 			final List<ChoiceBox<PropertyValue>> collect = IntStream.range(0, fieldsToEdit.size()).mapToObj(addFields(grid, fieldsToEdit)).collect(Collectors.toList());
@@ -307,6 +422,34 @@ public class ProfileWorker {
 
 			return setupDialog.showAndWait().map(String.class::cast);
 		}).get();
+	}
+
+	public static RannableThrowing<IOException> getNewSerialNunber(Boolean isFrequencyConverter) {
+		return ()->{
+			newSerialNumber = getSerialNumberAutomatically(isFrequencyConverter);
+			Platform.runLater(
+					()->
+					Optional.ofNullable(tfSerialNumber)
+					.filter(tf-> tf.getText().isEmpty())
+					.ifPresent(tf->tf.setText(newSerialNumber)));
+		};
+	}
+
+	public static RannableThrowing<IOException> getSerialNamberFromProfile(Path profilePath) {
+		return ()->getSerialNumber(profilePath).ifPresent(
+				sn->
+				Platform.runLater(
+						()->{
+							tfSerialNumber.setText(sn);
+							tfSerialNumber.addEventFilter(KeyEvent.KEY_PRESSED,
+									e->{
+										// on ESCAPE put back serial number from profile
+										if (e.getCode() == KeyCode.ESCAPE) {
+											e.consume();
+											tfSerialNumber.setText(sn);
+										}
+
+									}); }));
 	}
 
 	private static Boolean isFrequencyConverter(final Path profilePath) throws IOException {
@@ -407,7 +550,7 @@ public class ProfileWorker {
 		return dialog.showAndWait().orElse(null);
 	}
 
-	private static GridPane gridWithSerialNumber(final TextField tfSerialNumber) {
+	private static GridPane createGridWithSerialNumberField(final TextField tfSerialNumber) {
 		GridPane grid = new GridPane();
 
 		grid.setHgap(10);
@@ -418,7 +561,7 @@ public class ProfileWorker {
 		grid.add(new Label("Serial Number:"), 0, 0);
 		grid.add(tfSerialNumber, 1, 0);
 
-		tfSerialNumber.setPromptText("Auto");
+		tfSerialNumber.setPromptText("Serial Number");
 		tfSerialNumber.setTooltip(new Tooltip("Leave this field blank to automatically receive the serial number."));
 		return grid;
 	}
@@ -442,7 +585,7 @@ public class ProfileWorker {
 	private static byte[] setSerialNumber(String serialNumber, String profile) {
 		int index = profile.indexOf("device-serial-number ");
 		StringBuffer sb = new StringBuffer(profile.substring(0, index));
-		sb.append("device-serial-number ").append(serialNumber).append(System.lineSeparator());
+		sb.append("device-serial-number ").append(serialNumber).append(LINE_SEPARATOR);
 		sb.append(profile.substring(profile.indexOf("\n", index)+1));
 		return sb.toString().getBytes();
 	}
@@ -520,7 +663,7 @@ public class ProfileWorker {
 							.map(l->properties.get(l))
 							.map(p->p.owner.key + " " + p.value + "\t " + PROPERTY_TO_SHOW + p.owner.commentLine)
 							.orElse(line))
-					.collect(Collectors.joining(System.lineSeparator()));
+					.collect(Collectors.joining(LINE_SEPARATOR));
 
 		}
 	}
@@ -583,16 +726,14 @@ public class ProfileWorker {
 
 	private static List<PropertyLine> getFieldsToEdit(Path path) throws IOException {
 
-		try (Stream<String> fileLines = Files.lines(path)) {
-
-			return getFieldsToEdit(fileLines);
-
+		try (Stream<String> fileStream = Files.lines(path)) {
+			return getFieldsToEdit(fileStream);
 		}
 	}
 
-	private static List<PropertyLine> getFieldsToEdit(Stream<String> fileLines) {
+	private static List<PropertyLine> getFieldsToEdit(Stream<String> fileStream) {
 
-		final Map<Boolean, List<PropertyLine>> collect = fileLines
+		final Map<Boolean, List<PropertyLine>> collect = fileStream
 
 				.filter(l->l.contains(PROPERTY_TO_SHOW))
 				.map(PropertyLine::new)
@@ -665,6 +806,10 @@ public class ProfileWorker {
 						}));
 	}
 
+	/** Find and load profile file from a given directory (dir)
+	 * @param dir
+	 * @return
+	 */
 	private static synchronized Properties propertiesFrom(File dir) {
 
 		Properties properties = new Properties();
@@ -848,7 +993,7 @@ public class ProfileWorker {
 									}
 
 									saveAndUpload(file, s, bytes);
-								}));	//TODO edit profile
+								}));
 
 							} catch (Exception e) {
 								throw new RuntimeException(e);

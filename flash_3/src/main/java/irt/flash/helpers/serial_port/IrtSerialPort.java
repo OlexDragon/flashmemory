@@ -8,5 +8,6 @@ public interface IrtSerialPort {
 	boolean setParams(int baudRate, int databits8, int stopbits1, int parityEven) throws Exception;
 	boolean isOpened();
 	boolean writeBytes(byte[] bytes) throws Exception;
-	byte[] read(int maxVarRamSize) throws Exception;
+	byte[] read(int size) throws Exception;
+	byte[] read(int size, int timeout) throws Exception;
 }

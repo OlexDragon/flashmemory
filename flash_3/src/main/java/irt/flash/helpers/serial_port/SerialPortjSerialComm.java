@@ -14,6 +14,7 @@ import com.fazecast.jSerialComm.SerialPortEvent;
 
 import irt.flash.FlashController;
 import irt.flash.helpers.ThreadWorker;
+import jssc.SerialPortException;
 
 public class SerialPortjSerialComm implements IrtSerialPort {
 
@@ -69,27 +70,27 @@ public class SerialPortjSerialComm implements IrtSerialPort {
 										if(noZeros.length==0)
 											return;
 
-										final byte[] b = new byte[noZeros.length];
-										IntStream.range(0, b.length).forEach(index->b[index]=(byte) noZeros[index]);
-
 										synchronized (serialPort) {
 											if(buffer==null)
-												buffer = b;
+												buffer = tmp;
 
 											else {
-												final byte[] copyOfBuffer = Arrays.copyOf(buffer, buffer.length + b.length);
-												System.arraycopy(b, 0, copyOfBuffer, buffer.length, b.length);
+												final byte[] copyOfBuffer = Arrays.copyOf(buffer, buffer.length + tmp.length);
+												System.arraycopy(tmp, 0, copyOfBuffer, buffer.length, tmp.length);
 												buffer = copyOfBuffer;
 											}
 										}
 
 										synchronized(SerialPortjSerialComm.this){
 											SerialPortjSerialComm.this.notify();
-											logger.debug("notify();\n buffer: {},\n new bytes: {};\n", buffer, b);
+											logger.debug("notify();\n buffer: size: {} - {},\n new bytes: {};\n", buffer.length, buffer, tmp);
 										}
 									});
 
 						}});
+		else
+			throw new SerialPortException(getPortName(), "openPort", "Port busy or not found");
+
 		return openPort;
 	}
 
@@ -126,11 +127,17 @@ public class SerialPortjSerialComm implements IrtSerialPort {
 		if(size<=0)
 			size = Integer.MAX_VALUE;
 
-		final long start = System.currentTimeMillis();
-		long elapsed = 0;
 		final long min = TimeUnit.SECONDS.toMillis(FlashController.MIN_WAIT_TIME_IN_SECONDS);
 		final long max = TimeUnit.MINUTES.toMillis(FlashController.MAX_WAIT_TIME_IN_MINUTES);
 		final int waitTime = Optional.of(size*min).filter(time->time<max).orElse(max).intValue();
+
+		return read(size, waitTime);
+	}
+
+	public byte[] read(int size, final int waitTime) throws InterruptedException {
+
+		long elapsed;
+		final long start = System.currentTimeMillis();
 
 		while((buffer==null || buffer.length<size) && (elapsed=(System.currentTimeMillis()-start))<waitTime) {
 

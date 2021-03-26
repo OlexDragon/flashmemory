@@ -1,7 +1,6 @@
 package irt.flash.helpers;
 
 import static irt.flash.exception.ExceptionWrapper.catchConsumerException;
-import static irt.flash.exception.ExceptionWrapper.catchRunnableException;
 import static irt.flash.exception.ExceptionWrapper.catchSupplierException;
 
 import java.io.BufferedReader;
@@ -23,6 +22,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.TreeSet;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
 import java.util.stream.Stream;
 
@@ -40,18 +40,22 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 
+/**
+ * Collect information about Device (Unit)
+ * @author Alex (Oleksandr Potomkin)
+ */
 public class DeviceWorker {
+	private static final Logger logger = LogManager.getLogger();
 
 	private static final String KEY_SELECTED_DEVICE_GROUP = "selected_device_group";
 
 	private static final String TEMPLATE_PATH = "Z:\\4Olex\\flash\\templates";
 
-	private static final Logger logger = LogManager.getLogger();
-
 	public static final String DEVICE_SERIAL_NUMBER	 = "device-serial-number";
 	public static final String DEVICE_SUBTYPE		 = "device-subtype";
 	public static final String DEVICE_REVISION		 = "device-revision";
 	public static final String DEVICE_TYPE			 = "device-type";
+	public static final String DEVICE_MAC_ADDRESS	 = "mac-address";
 
 	private static final String DEFAULT_TEMPLATE_S_PATH = "Default Template's Path";
 
@@ -100,10 +104,12 @@ public class DeviceWorker {
 							});
 				});
 
-		Optional.ofNullable(prefs).flatMap(p->Optional.ofNullable(p.get(KEY_SELECTED_DEVICE_GROUP, null))).map(File::new).ifPresent(f->chbDeviceGroup.getSelectionModel().select(f));
+		Optional.ofNullable(prefs)
+		.flatMap(p->Optional.ofNullable(p.get(KEY_SELECTED_DEVICE_GROUP, null))).map(File::new)
+		.ifPresent(f->chbDeviceGroup.getSelectionModel().select(f));
 	}
 
-	public void setReadData(ByteBuffer byteBuffer) {
+	public void setReadData(ByteBuffer byteBuffer) throws IOException {
 
 		deviceType = null;
 
@@ -121,24 +127,15 @@ public class DeviceWorker {
 		Platform.runLater(()->txtArea.setText(profile));
 		logger.info("\n{}", profile);
 
-		Optional.ofNullable(uploadWorker).ifPresent(
+		try(	final StringReader stringReader = new StringReader(profile);
+				final BufferedReader bufferedReader = new BufferedReader(stringReader);
+				final Stream<String> stream = bufferedReader.lines();){
 
-				uw->
-				ThreadWorker.runThread(
-						catchRunnableException(
-								()->{
+			Properties deviceProperties = getDeviceProperties(stream);
 
-									try(	final StringReader stringReader = new StringReader(profile);
-											final BufferedReader bufferedReader = new BufferedReader(stringReader);
-											final Stream<String> stream = bufferedReader.lines();){
-
-										Properties deviceProperties = getDeviceProperties(stream);
-
-										selectProgramByDeviceType(deviceProperties);
-										searchFileBySerialNumber(deviceProperties.getProperty(DEVICE_SERIAL_NUMBER));
-
-									}
-								})));
+			selectProgramByDeviceType(deviceProperties);
+			searchFileBySerialNumber(deviceProperties.getProperty(DEVICE_SERIAL_NUMBER));
+		}
 	}
 
 	/**
@@ -146,6 +143,7 @@ public class DeviceWorker {
 	 * @return Properties contains keys DEVICE_TYPE, DEVICE_REVISION, DEVICE_SUBTYPE and DEVICE_SERIAL_NUMBER.
 	 */
 	public static Properties getDeviceProperties(final Stream<String> stream) {
+		logger.traceEntry();
 
 		Properties deviceProperties = new Properties();
 
@@ -156,7 +154,8 @@ public class DeviceWorker {
 				line.startsWith(DEVICE_TYPE) ||
 				line.startsWith(DEVICE_REVISION) ||
 				line.startsWith(DEVICE_SUBTYPE) ||
-				line.startsWith(DEVICE_SERIAL_NUMBER))
+				line.startsWith(DEVICE_SERIAL_NUMBER) ||
+				line.startsWith(DEVICE_MAC_ADDRESS))
 		.limit(4)
 		.map(line->line.split("\\s++", 2))
 		.forEach(
@@ -170,48 +169,53 @@ public class DeviceWorker {
 	}
 
 	public static void selectProgramByDeviceType(Properties properties) throws IOException {
+		logger.traceEntry("{}", properties);
 
 		deviceType = getDeviceType(properties).orElse(null);
 
 		if(deviceType==null)
 			return;
 
-		final String pathToProfileFolder = deviceType + ".path";
-		Path programPath = Optional.ofNullable(flash3Properties.getProperty(pathToProfileFolder)).map(Paths::get)
+		ThreadWorker.runThread(
+				()->{
 
-				.orElseGet(
-						catchSupplierException(
+					final String pathToProfileFolder = deviceType + ".path";
+					Path programPath = Optional.ofNullable(flash3Properties.getProperty(pathToProfileFolder)).map(Paths::get)
 
-								()->{
-
-									FutureTask<File> task = ThreadWorker.runFxFutureTask(
+							.orElseGet(
+									catchSupplierException(
 
 											()->{
 
-												FileChooser fileChooser = new FileChooser();
-												fileChooser.setTitle("Select the program to upload");
-												fileChooser.getExtensionFilters().add(new ExtensionFilter("IRT Technologies BIN file", "*.bin"));
-												return fileChooser.showOpenDialog(txtArea.getScene().getWindow());
-											});
+												FutureTask<File> task = ThreadWorker.runFxFutureTask(
 
-									File fileForProperties = null;
-									fileForProperties = task.get();
+														()->{
 
-									final Optional<File> oResult = Optional.ofNullable(fileForProperties);
-									// Save link to profile folder
-									oResult.ifPresent(
-													f->{
-														try {
-															saveProperty(pathToProfileFolder, f.toString());
-														} catch (IOException e) {
-															throw new WrapperException(e);
-														}
-													});
+															FileChooser fileChooser = new FileChooser();
+															fileChooser.setTitle("Select the program to upload");
+															fileChooser.getExtensionFilters().add(new ExtensionFilter("IRT Technologies BIN file", "*.bin"));
+															return fileChooser.showOpenDialog(txtArea.getScene().getWindow());
+														});
 
-									return oResult.map(File::toPath).orElse(null);
-								}));
+												File fileForProperties = null;
+												fileForProperties = task.get();
 
-		uploadWorker.setProgramPath(programPath);
+												final Optional<File> oResult = Optional.ofNullable(fileForProperties);
+												// Save link to profile folder
+												oResult.ifPresent(
+																f->{
+																	try {
+																		saveProperty(pathToProfileFolder, f.toString());
+																	} catch (IOException e) {
+																		throw new WrapperException(e);
+																	}
+																});
+
+												return oResult.map(File::toPath).orElse(null);
+											}));
+
+					uploadWorker.setProgramPath(programPath);
+				});
 	}
 
 	private static void loadFlashProperties() {
@@ -291,6 +295,8 @@ public class DeviceWorker {
 	}
 
 	private void searchFileBySerialNumber(String serialNumber) {
+		logger.traceEntry();
+
 		Optional.ofNullable(serialNumber)
 		.map(String::toUpperCase)
 		.ifPresent(

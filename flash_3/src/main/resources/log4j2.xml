@@ -32,7 +32,7 @@
 <!-- 		<logger name="irt.flash.helpers.UploadWorker" level="all" /> -->
 <!-- 		<logger name="irt.flash.helpers.serial_port.SerialPortjSerialComm" level="all" /> -->
 
-        <Root level="warn">
+        <Root level="error">
             <AppenderRef ref="ConsoleAppender" />
 			<AppenderRef ref="LogFile" />
         </Root>

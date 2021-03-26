@@ -64,9 +64,11 @@ public class ComPortWorker {
 
 	public Optional<IrtSerialPort> conect(int baudRate) throws Exception{
 
+		// Close the serial port if open
 		if(closeComPort().isPresent()) 
      		return Optional.empty();
 
+		// Create and open a new serial port
 		final String portName = chbPorts.getSelectionModel().getSelectedItem();
 
 		final Constructor<?> constructor = serialPortClass.getConstructor(String.class);
@@ -84,6 +86,7 @@ public class ComPortWorker {
 
 			return Optional.of(serialPort);
 		}
+		logger.error("1");
 
  		return Optional.empty();
 	}
@@ -91,7 +94,7 @@ public class ComPortWorker {
 	private Optional<IrtSerialPort> closeComPort() {
 
 		final Optional<IrtSerialPort> oComPort = Optional.ofNullable((IrtSerialPort)chbPorts.getUserData());
-		oComPort.map(IrtSerialPort.class::cast).ifPresent(
+		oComPort.ifPresent(
 				sp->{
 					try {
 						sp.closePort();

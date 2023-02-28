@@ -98,7 +98,8 @@ public class ProfileWorker {
 	private String profile;
 
 	private static ChoiceBox<ThreadWorker> chbEdit;
-	private static TextField tfSerialNumber;
+	private static TextField tfUnitSerialNumber;
+	private static TextField tfPcbSerialNumber;
 	
 	public ProfileWorker(ChoiceBox<ThreadWorker> chbEdit) {
 
@@ -216,8 +217,10 @@ public class ProfileWorker {
 							.orElseGet(()->chooseDirectory(propertyName, profile, properties));
 
 					// Return if properties do not contain profile directory
-					if(saveDirectory==null)
+					if(saveDirectory==null) {
+						FlashController.showAlert("Profile Setup.", "The profile save directory is not set.", AlertType.WARNING);
 						return;
+					}
 
 					ThreadWorker.runThread(
 							()->{
@@ -227,14 +230,16 @@ public class ProfileWorker {
 									.ifPresent(
 											catchConsumerException(
 													profileToWrite->{
-														String serialNumber = Optional.of(tfSerialNumber)
+														String serialNumber = Optional.of(tfUnitSerialNumber)
 
 																.map(tf->tf.getText().trim())
 																.filter(t->!t.isEmpty())
-																.orElseGet(catchSupplierException(()->waitForSerialNumber(tfSerialNumber)));
+																.orElseGet(catchSupplierException(()->waitForSerialNumber(tfUnitSerialNumber)));
 
-														if(serialNumber==null)
+														if(serialNumber==null) {
+															FlashController.showAlert("Profile Setup.", "The unit serial number is not set.", AlertType.WARNING);
 															return;
+														}
 
 														final byte[] bytes = setSerialNumber(serialNumber, profileToWrite);
 //														if(!isFrequencyConverter)
@@ -397,11 +402,12 @@ public class ProfileWorker {
 		if(isFrequencyConverter==null)
 			return Optional.empty();
 
-		tfSerialNumber = new TextField();
+		tfUnitSerialNumber = new TextField();
+		tfPcbSerialNumber = new TextField();
 
 		//	if text field is empty put auto generated serial number
-		tfSerialNumber.textProperty().addListener(
-				(o,ov,nv)->Optional.ofNullable(newSerialNumber).filter(nsn->nv.isEmpty()).ifPresent(nsn->tfSerialNumber.setText(nsn)));
+		tfUnitSerialNumber.textProperty().addListener(
+				(o,ov,nv)->Optional.ofNullable(newSerialNumber).filter(nsn->nv.isEmpty()).ifPresent(nsn->tfUnitSerialNumber.setText(nsn)));
 
 		//set Serial Number from profile
 		ThreadWorker.runThread(catchRunnableException(getSerialNamberFromProfile(profilePath)));
@@ -412,7 +418,7 @@ public class ProfileWorker {
 
 		return ThreadWorker.runFxFutureTask(()->{
 
-			final GridPane grid = createGridWithSerialNumberField(tfSerialNumber);
+			final GridPane grid = createGridWithSerialNumberField();
 
 			final List<PropertyLine> fieldsToEdit = getFieldsToEdit(profilePath);
 			final List<ChoiceBox<PropertyValue>> collect = IntStream.range(0, fieldsToEdit.size()).mapToObj(addFields(grid, fieldsToEdit)).collect(Collectors.toList());
@@ -429,7 +435,7 @@ public class ProfileWorker {
 			newSerialNumber = getSerialNumberAutomatically(isFrequencyConverter);
 			Platform.runLater(
 					()->
-					Optional.ofNullable(tfSerialNumber)
+					Optional.ofNullable(tfUnitSerialNumber)
 					.filter(tf-> tf.getText().isEmpty())
 					.ifPresent(tf->tf.setText(newSerialNumber)));
 		};
@@ -440,13 +446,13 @@ public class ProfileWorker {
 				sn->
 				Platform.runLater(
 						()->{
-							tfSerialNumber.setText(sn);
-							tfSerialNumber.addEventFilter(KeyEvent.KEY_PRESSED,
+							tfUnitSerialNumber.setText(sn);
+							tfUnitSerialNumber.addEventFilter(KeyEvent.KEY_PRESSED,
 									e->{
 										// on ESCAPE put back serial number from profile
 										if (e.getCode() == KeyCode.ESCAPE) {
 											e.consume();
-											tfSerialNumber.setText(sn);
+											tfUnitSerialNumber.setText(sn);
 										}
 
 									}); }));
@@ -550,19 +556,25 @@ public class ProfileWorker {
 		return dialog.showAndWait().orElse(null);
 	}
 
-	private static GridPane createGridWithSerialNumberField(final TextField tfSerialNumber) {
+	private static GridPane createGridWithSerialNumberField() {
 		GridPane grid = new GridPane();
 
 		grid.setHgap(10);
 		grid.setVgap(10);
 		grid.setPadding(new Insets(10, 10, 10, 10));
+
+		//Unit Serial Number
 		grid.getRowConstraints().add(new RowConstraints());
-
 		grid.add(new Label("Serial Number:"), 0, 0);
-		grid.add(tfSerialNumber, 1, 0);
+		grid.add(tfUnitSerialNumber, 1, 0);
 
-		tfSerialNumber.setPromptText("Serial Number");
-		tfSerialNumber.setTooltip(new Tooltip("Leave this field blank to automatically receive the serial number."));
+		//PCB Serial Number
+		grid.getRowConstraints().add(new RowConstraints());
+		grid.add(new Label("PCB S/N"), 0, 1);
+		grid.add(tfPcbSerialNumber, 1, 1);
+
+		tfUnitSerialNumber.setPromptText("Serial Number");
+		tfUnitSerialNumber.setTooltip(new Tooltip("Leave this field blank to automatically receive the serial number."));
 		return grid;
 	}
 
@@ -585,8 +597,9 @@ public class ProfileWorker {
 	private static byte[] setSerialNumber(String serialNumber, String profile) {
 		int index = profile.indexOf("device-serial-number ");
 		StringBuffer sb = new StringBuffer(profile.substring(0, index));
-		sb.append("device-serial-number ").append(serialNumber).append(LINE_SEPARATOR);
-		sb.append(profile.substring(profile.indexOf("\n", index)+1));
+		sb.append("device-serial-number ").append(serialNumber);
+		Optional.ofNullable(tfPcbSerialNumber.getText()).map(String::trim).filter(t->!t.isEmpty()).ifPresent(pcbSN->sb.append("\t # PCB Serial Number: ").append(pcbSN));
+		sb.append(LINE_SEPARATOR).append(profile.substring(profile.indexOf("\n", index)+1));
 		return sb.toString().getBytes();
 	}
 
@@ -975,7 +988,7 @@ public class ProfileWorker {
 
 									case COPY:
 
-										final String newSN = tfSerialNumber.getText().trim();
+										final String newSN = tfUnitSerialNumber.getText().trim();
 										bytes = setSerialNumber(newSN, s);
 										file = new File(oFile.map(File::getParent).get(), newSN + ".bin");
 										logger.debug("new SN: {};", text);
@@ -1033,7 +1046,7 @@ public class ProfileWorker {
 
 	private Optional<ButtonType> compareSerialNumbers(String s) throws IOException {
 
-		final String setSerialNumber = tfSerialNumber.getText().trim();
+		final String setSerialNumber = tfUnitSerialNumber.getText().trim();
 
 		final ButtonType renameButton	 = new ButtonType(RENAME);
 		final ButtonType copyButton		 = new ButtonType(COPY);

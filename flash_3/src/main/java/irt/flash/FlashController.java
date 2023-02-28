@@ -220,7 +220,7 @@ public class FlashController {
 				});
 	}
 
-    @FXML public  void onBaudRate() {
+    @FXML public void onBaudRate() {
     	List<Integer> choices = new ArrayList<>();
 //       	choices.add(SerialPort.BAUDRATE_110);
 //       	choices.add(SerialPort.BAUDRATE_300);

@@ -136,10 +136,10 @@ public class FlashController {
 
     	uploadWorker = new UploadWorker(chbUpload, chbEdit);
     	readWorker.setUploadWorker(uploadWorker);
-    	deviceWorker.setUploadWorker(uploadWorker);
+    	DeviceWorker.setUploadWorker(uploadWorker);
 
     	final ProfileWorker profileWorker = new ProfileWorker(chbEdit);
-    	profileWorker.setUploadWorker(uploadWorker);
+    	ProfileWorker.setUploadWorker(uploadWorker);
     	deviceWorker.setProfileWorker(profileWorker);
     	uploadWorker.setProfileWorker(profileWorker);
 

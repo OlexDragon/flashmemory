@@ -33,9 +33,9 @@ public class ReadFlashWorker {
 	public static final int MAX_VAR_RAM_SIZE = 256;// Bytes
 	public static byte[] MAX_BYTES_TO_READ = new byte[] { (byte) (MAX_VAR_RAM_SIZE-1), (byte) ((MAX_VAR_RAM_SIZE-1) ^ 0xFF) };
 
-	private static ByteBuffer byteBuffer; 	public static ByteBuffer getByteBuffer() { return byteBuffer; }
+	private final int MAX_BUFFER_SIZE = 1000000;
 
-	private static final int MAX_BUFFER_SIZE = 1000000;
+	private ByteBuffer byteBuffer; 
 
 	private IrtSerialPort serialPort;
 	private DeviceWorker deviceWorker;

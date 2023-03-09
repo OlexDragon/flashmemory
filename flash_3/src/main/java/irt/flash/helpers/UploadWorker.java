@@ -56,6 +56,8 @@ import javafx.scene.control.SingleSelectionModel;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import jssc.SerialPortTimeoutException;
+import lombok.Getter;
+import lombok.Setter;
 
 public class UploadWorker {
 
@@ -83,10 +85,12 @@ public class UploadWorker {
 
 	private final static Preferences prefs = Preferences.userNodeForPackage(Flash3App.class);
 
+	@Setter
 	private IrtSerialPort serialPort;
 
 	private ChoiceBox<ThreadWorker> chbEdit;
 
+	@Setter
 	private ProfileWorker profileWorker;
 
 	public UploadWorker(ChoiceBox<Object> chbUpload, ChoiceBox<ThreadWorker> chbEdit) {
@@ -476,6 +480,8 @@ public class UploadWorker {
 			return FlashWorker.sendBytes(serialPort, bytes);
 	}
 
+
+	@Getter @Setter
 	public static class PathHolder{
 
 		private String title;
@@ -495,14 +501,6 @@ public class UploadWorker {
 			this.title = Optional.ofNullable(path).map(Path::getFileName).map(Path::toString).orElse("No Path Specified");
 		}
 
-		public UnitAddress getUnitAddress() {
-			return unitAddress;
-		}
-
-		public void setUnitAddress(UnitAddress unitAddress) {
-			this.unitAddress = unitAddress;
-		}
-
 		@Override
 		public String toString() {
 			return title;
@@ -512,13 +510,5 @@ public class UploadWorker {
 	public void setUnitAddress(UnitAddress unitAddress) {
 		profile.setUnitAddress(unitAddress);
 		otherProfile.setUnitAddress(unitAddress);
-	}
-
-	public void setSerialPort(IrtSerialPort serialPort) {
-		this.serialPort = serialPort;
-	}
-
-	public void setProfileWorker(ProfileWorker profileWorker) {
-		this.profileWorker = profileWorker;
 	}
 }

@@ -38,6 +38,7 @@ import javafx.scene.control.TextArea;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
+import lombok.Setter;
 
 /**
  * Collect information about Device (Unit)
@@ -51,9 +52,9 @@ public class DeviceWorker {
 	private static final String TEMPLATE_PATH = "Z:\\4Olex\\flash\\templates";
 
 	public static final String DEVICE_SERIAL_NUMBER	 = "device-serial-number";
-	public static final String DEVICE_SUBTYPE		 = "device-subtype";
-	public static final String DEVICE_REVISION		 = "device-revision";
-	public static final String DEVICE_TYPE			 = "device-type";
+	private static final String DEVICE_TYPE			 = "device-type";
+	private static final String DEVICE_REVISION		 = "device-revision";
+	private static final String DEVICE_SUBTYPE		 = "device-subtype";
 	public static final String DEVICE_MAC_ADDRESS	 = "mac-address";
 
 	private static final String DEFAULT_TEMPLATE_S_PATH = "Default Template's Path";
@@ -61,8 +62,9 @@ public class DeviceWorker {
 	private final static Preferences prefs = Preferences.userNodeForPackage(Flash3App.class);
 
 	private static TextArea txtArea;
+	@Setter
 	private static UploadWorker uploadWorker;
-
+	@Setter
 	private ProfileWorker profileWorker;
 
 	private static File defaultDirectory; 	public static File getDefaultDirectory() { return defaultDirectory; }
@@ -280,13 +282,13 @@ public class DeviceWorker {
 		return 	Optional
 				.ofNullable(properties.getProperty(DEVICE_TYPE))
 				.flatMap(
-						t->
+						deviceType->
 						Optional.ofNullable(properties.getProperty(DEVICE_REVISION))
-						.map(r->t + "." + r))
-				.flatMap(
-						r->
-						Optional.ofNullable(properties.getProperty(DEVICE_SUBTYPE))
-						.map(s->r + "." + s));
+						.map(revision->deviceType + "." + revision));
+//				.flatMap(
+//						r->
+//						Optional.ofNullable(properties.getProperty(DEVICE_SUBTYPE))
+//						.map(s->r + "." + s));
 	}
 
 	public static Optional<String> getFlash3Property(String key) {
@@ -361,22 +363,17 @@ public class DeviceWorker {
 		return bytes.length;
 	}
 
-	public void setUploadWorker(UploadWorker uploadWorker) {
-		DeviceWorker.uploadWorker = uploadWorker;
-	}
-
-	public void setProfileWorker(ProfileWorker profileWorker) {
-		this.profileWorker = profileWorker;
-	}
-
 	public static void saveProperty(String key, String value) throws FileNotFoundException, IOException {
-
+		// Reload Flash3 Properties
+		flash3Properties.clear();
+		flash3Properties.load(new FileReader(flash3PropertiesFile));
+		//Put new Value
 		flash3Properties.put(key, value);
 		saveFlash3Properties();
 	}
 
 	private static void saveFlash3Properties() throws FileNotFoundException, IOException {
-		final String name = flash3PropertiesFile.getName().replace(".properties", ".old");
+		final String name = flash3PropertiesFile.getName().replace(".properties", "." + UploadWorker.COMPUTERNAME);
 		final Path path = flash3PropertiesFile.toPath();
 		try {
 			Files.copy(path, path.resolveSibling(name), StandardCopyOption.REPLACE_EXISTING);

@@ -1,5 +1,9 @@
 package irt.flash.data;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public enum FlashCommand {
 	EMPTY			(new byte[] { }),
 	/** DEC:{127}; HEX:{0x7F} */
@@ -18,10 +22,6 @@ public enum FlashCommand {
 	EXTENDED_ERASE	(new byte[] { 0x44, (byte) 0xBB });
 
 	private byte[] command;
-
-	private FlashCommand(byte[] command) {
-		this.command = command;
-	}
 
 	public byte[] toBytes() {
 		return command;

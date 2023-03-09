@@ -5,6 +5,10 @@ import java.util.Optional;
 
 import javax.xml.bind.DatatypeConverter;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@AllArgsConstructor @Getter
 public enum FlashAnswer {
 	UNKNOWN	((byte) -1),
 	NULL	((byte) 0),
@@ -12,14 +16,6 @@ public enum FlashAnswer {
 	NACK	((byte) 0x1F);
 
 	private final Byte answer;
-
-	private FlashAnswer(byte answer) {
-		this.answer = answer;
-	}
-
-	public byte getAnswer() {
-		return answer;
-	}
 
 	public static Optional<FlashAnswer> valueOf(byte key){
 		final Optional<FlashAnswer> findAny = Arrays

@@ -72,6 +72,7 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.Window;
 import javafx.util.Pair;
 import javafx.util.StringConverter;
+import lombok.Setter;
 
 public class ProfileWorker {
 
@@ -83,13 +84,12 @@ public class ProfileWorker {
 	private static final String COPY = "Copy";
 	private static final String RENAME = "Rename";
 
-	private static final String TYPE = ".type";
-
 	private static final String EDIT_PROFILE = "Edit Profile";
 	public static final String EDIT = "Edit ...";
 	private static final String PROPERTY_TO_SHOW = "#=";
 
 	private static String newSerialNumber;
+	@Setter
 	private static UploadWorker uploadWorker;
 
 	private static Boolean isFrequencyConverter;
@@ -502,7 +502,7 @@ public class ProfileWorker {
 
 	public static Optional<UnitAddress> getUnitAddress(final Stream<String> stream) {
 
-		final String key = getDeviceType(stream).map(dt->dt +  TYPE).orElse(null);
+		final String key = getDeviceType(stream).map(dt->dt +  ".type").orElse(null);
 
 		if(key==null)
 			return Optional.empty();
@@ -714,7 +714,7 @@ public class ProfileWorker {
 		return index->{
 
 			final PropertyLine propertyLine = fieldsToEdit.get(index);
-			final int rowIndex = ++index;
+			final int rowIndex = index + 2;
 			grid.add(new Label(propertyLine.title), 0, rowIndex);
 
 			return Optional.ofNullable(propertyLine.propertyValues).map(
@@ -912,10 +912,6 @@ public class ProfileWorker {
 			return Optional.ofNullable(propertyValue).map(pv->key.compareTo(pv.key)).orElse(1);
 		}
 
-	}
-
-	public void setUploadWorker(UploadWorker uploadWorker) {
-		ProfileWorker.uploadWorker = uploadWorker;
 	}
 
 	public void setProfile(final String profile) {

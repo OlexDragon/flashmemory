@@ -385,7 +385,7 @@ public class ProfileWorker {
 	}
 
 	private static Optional<UnitAddress> getUnitAddress(String profile) throws IOException {
-		logger.error(profile);
+		logger.traceEntry(profile);
 
 		try(	final StringReader stringReader = new StringReader(profile);
 				final BufferedReader bufferedReader = new BufferedReader(stringReader);

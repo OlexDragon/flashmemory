@@ -116,21 +116,21 @@ public class ReadFlashWorker {
 
 		byteBuffer = null;
 
-				// share the UnitAddresst with uploadWorker
-			uploadWorker.setUnitAddress(unitAddress);
-			Flash3App.setAppTitle(unitAddress.name());
+		// share the UnitAddresst with uploadWorker
+		uploadWorker.setUnitAddress(unitAddress);
+		Flash3App.setAppTitle(unitAddress.name());
 
-			if(serialPort == null || !serialPort.isOpened()) {
-				final String message = "Unit is not connected.";
-				logger.debug(message);
-				FlashController.showAlert("Connection error.", message, AlertType.ERROR);
-				return;
-			}
+		if(serialPort == null || !serialPort.isOpened()) {
+			final String message = "Unit is not connected.";
+			logger.debug(message);
+			FlashController.showAlert("Connection error.", message, AlertType.ERROR);
+			return;
+		}
 
-			byteBuffer = ByteBuffer.allocate(MAX_BUFFER_SIZE);
+		byteBuffer = ByteBuffer.allocate(MAX_BUFFER_SIZE);
 
-			if(readFromFlash(unitAddress.getAddr()))
-					deviceWorker.setReadData(byteBuffer);
+		if(readFromFlash(unitAddress.getAddr()))
+			deviceWorker.setReadData(byteBuffer);
 	}
 
 	private boolean readFromFlash(final int addr) throws Exception{

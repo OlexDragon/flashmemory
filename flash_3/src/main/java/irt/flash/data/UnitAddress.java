@@ -14,7 +14,8 @@ public enum UnitAddress {
 	HP_BIAS		("HP BIAS"			, 0x081E0000),
 	SHELF		("SHELF CONTROLLER"	, 0x080E0000),
 	REF_BOARD	("REFERENCE BOARD"	, 0x08060000),
-	ORPC		("ORPC"				, 0x081C0000);
+	ORPC		("ORPC"				, 0x081C0000),
+	RCP_ORPC	("RCP ORPC"			, 0x081E0000);
 
 	private final String text;
 	private final int addr;
